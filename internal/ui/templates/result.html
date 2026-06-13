@@ -1,0 +1,76 @@
+{{define "result_card"}}
+<article class="card result status-{{.Status}}">
+  <div class="status-line">
+    <span class="status-badge">{{statusIcon .Status}} {{statusLabel .Status}}</span>
+  </div>
+  <h2>{{statusHeadline .Status}}</h2>
+  <p>{{.Summary}}</p>
+
+  <dl class="details">
+    <div><dt>Host</dt><dd>{{.Host}}</dd></div>
+    <div><dt>Port</dt><dd>{{.Port}}</dd></div>
+    <div><dt>SNI</dt><dd>{{.SNI}}</dd></div>
+    {{if .ResolvedIPs}}
+    <div><dt>Resolved IPs</dt><dd>{{range $i, $ip := .ResolvedIPs}}{{if $i}}, {{end}}{{$ip}}{{end}}</dd></div>
+    {{end}}
+  </dl>
+
+  <details {{if eq .Status "supported"}}open{{end}}>
+    <summary>Probe details</summary>
+    <div class="probe-grid">
+      <section>
+        <h3>Control probe</h3>
+        <dl class="probe-meta">
+          <div>
+            <dt>Offered curves</dt>
+            <dd>{{if .ControlProbe.OfferedCurves}}{{range $i, $curve := .ControlProbe.OfferedCurves}}{{if $i}}, {{end}}{{$curve}}{{end}}{{else}}none recorded{{end}}</dd>
+          </div>
+          <div>
+            <dt>Negotiated curve</dt>
+            <dd>{{if .ControlProbe.NegotiatedCurve}}{{.ControlProbe.NegotiatedCurve}}{{else}}not negotiated{{end}}</dd>
+          </div>
+        </dl>
+        <pre>{{pretty .ControlProbe}}</pre>
+      </section>
+      <section>
+        <h3>X25519MLKEM768-only probe</h3>
+        <dl class="probe-meta">
+          <div>
+            <dt>Offered curves</dt>
+            <dd>{{if .PQProbe.OfferedCurves}}{{range $i, $curve := .PQProbe.OfferedCurves}}{{if $i}}, {{end}}{{$curve}}{{end}}{{else}}none recorded{{end}}</dd>
+          </div>
+          <div>
+            <dt>Negotiated curve</dt>
+            <dd>{{if .PQProbe.NegotiatedCurve}}{{.PQProbe.NegotiatedCurve}}{{else}}not negotiated{{end}}</dd>
+          </div>
+        </dl>
+        <pre>{{pretty .PQProbe}}</pre>
+      </section>
+    </div>
+  </details>
+
+  {{if .Warnings}}
+  <div class="warnings">
+    <h3>Warnings</h3>
+    <ul>
+      {{range .Warnings}}<li>{{.}}</li>{{end}}
+    </ul>
+  </div>
+  {{end}}
+
+  {{if .IPAttempts}}
+  <details>
+    <summary>Per-IP attempts</summary>
+    {{range .IPAttempts}}
+      <div class="attempt">
+        <h3>{{.IP}}</h3>
+        <div class="attempt-grid">
+          <pre>{{pretty .Control}}</pre>
+          <pre>{{pretty .PQ}}</pre>
+        </div>
+      </div>
+    {{end}}
+  </details>
+  {{end}}
+</article>
+{{end}}

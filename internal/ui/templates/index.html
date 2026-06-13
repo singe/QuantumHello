@@ -1,0 +1,22 @@
+{{define "title"}}QuantumHello{{end}}
+{{define "content"}}
+<section class="card compose">
+  <form id="check-form" method="post" action="/check" hx-post="/check" hx-target="#result" hx-swap="innerHTML">
+    <label for="url">URL or hostname</label>
+    <div class="input-row">
+      <input id="url" name="url" type="text" placeholder="cloudflare.com" autocomplete="off" spellcheck="false" value="{{.InputURL}}">
+      <button type="submit">Check</button>
+    </div>
+    <p class="hint">Examples: <code>cloudflare.com</code>, <code>https://google.com</code>, <code>example.com:443</code></p>
+  </form>
+</section>
+
+<section id="result">
+  {{if .Result}}{{template "result_card" .Result}}{{else}}
+  <div class="card empty-state">
+    <h2>Results</h2>
+    <p>The results will appear here. If the target is reachable, you’ll see TLS 1.3, cipher suite, and whether the X25519MLKEM768-only handshake worked.</p>
+  </div>
+  {{end}}
+</section>
+{{end}}

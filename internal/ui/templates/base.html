@@ -1,0 +1,74 @@
+{{define "base"}}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{block "title" .}}QuantumHello{{end}}</title>
+  <meta name="description" content="Check whether a host can negotiate TLS 1.3 with X25519MLKEM768.">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="shortcut icon" href="/favicon.ico">
+  <link rel="stylesheet" href="/static/app.css">
+  <script defer src="/static/htmx.min.js"></script>
+</head>
+<body>
+  <div class="page-shell">
+    <header class="hero">
+      <div class="hero-topbar">
+        <div class="brand">
+          <div class="brand-mark">
+            <img class="brand-logo" src="/images/logo.png" alt="QuantumHello logo" width="144" height="144">
+          </div>
+          <div>
+            <div class="eyebrow">TLS 1.3 + X25519MLKEM768 checker by @singe</div>
+            <h1>QuantumHello</h1>
+          </div>
+        </div>
+        <button
+          type="button"
+          class="api-button"
+          data-api-dialog-open
+          aria-haspopup="dialog"
+          aria-controls="api-dialog"
+        >API</button>
+      </div>
+      <p>Enter a hostname or HTTPS URL to check for post-quantum encryption support. The checker proves support by offering only <code>X25519MLKEM768</code> in a TLS 1.3 handshake.</p>
+    </header>
+    <main>
+      {{block "content" .}}{{end}}
+    </main>
+  </div>
+  <dialog id="api-dialog" class="api-dialog" aria-labelledby="api-dialog-title">
+    <form method="dialog" class="api-dialog-card">
+      <div class="api-dialog-header">
+        <div>
+          <h2 id="api-dialog-title">API usage</h2>
+          <p>Use the JSON endpoint for scriptable checks.</p>
+        </div>
+        <button type="submit" class="api-dialog-close" aria-label="Close dialog">×</button>
+      </div>
+
+      <div class="api-dialog-body">
+        <p>Request:</p>
+        <pre><code>curl 'https://your-app.fly.dev/api/check?url=cloudflare.com'</code></pre>
+
+        <p>Response:</p>
+        <pre><code>{
+  "status": "supported",
+  "control_probe": {
+    "offered_curves": ["X25519MLKEM768", "SecP256r1MLKEM768", "SecP384r1MLKEM1024", "X25519", "CurveP256", "CurveP384", "CurveP521"],
+    "negotiated_curve": "X25519MLKEM768"
+  },
+  "pq_probe": {
+    "offered_curves": ["X25519MLKEM768"],
+    "negotiated_curve": "X25519MLKEM768"
+  }
+}</code></pre>
+        <p class="api-note">Replace the host with any HTTPS hostname you want to check.</p>
+      </div>
+    </form>
+  </dialog>
+  <script defer src="/static/api-dialog.js"></script>
+</body>
+</html>
+{{end}}
