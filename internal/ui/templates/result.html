@@ -2,6 +2,9 @@
 <article class="card result status-{{.Status}}">
   <div class="status-line">
     <span class="status-badge">{{statusIcon .Status}} {{statusLabel .Status}}</span>
+    {{if .ShareURL}}
+    <button type="button" class="api-button" data-share-url="{{.ShareURL}}" data-share-button >Share this result</button>
+    {{end}}
   </div>
   <!--<h2>{{statusHeadline .Status}}</h2>-->
   <p>{{.Summary}}</p>

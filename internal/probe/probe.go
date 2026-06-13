@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"net/url"
 	"time"
 )
 
@@ -66,6 +67,7 @@ func (c *Checker) Check(ctx context.Context, input string, clientIP string) (Res
 		Host:       target.Host,
 		Port:       target.Port,
 		SNI:        target.SNI,
+		ShareURL:   "/?q=" + url.QueryEscape(input),
 	}
 
 	dnsCtx, cancel := context.WithTimeout(ctx, defaultDNSBudget)
@@ -239,6 +241,7 @@ func (c *Checker) checkResolved(ctx context.Context, input string, target Target
 		Host:        target.Host,
 		Port:        target.Port,
 		SNI:         target.SNI,
+		ShareURL:    "/?q=" + url.QueryEscape(input),
 		ResolvedIPs: make([]string, 0, len(ips)),
 	}
 	for _, ip := range ips {

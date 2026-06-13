@@ -28,6 +28,7 @@ type Result struct {
 	Host        string   `json:"host"`
 	Port        string   `json:"port"`
 	SNI         string   `json:"sni"`
+	ShareURL    string   `json:"share_url,omitempty"`
 	ResolvedIPs []string `json:"resolved_ips"`
 	Status      Status   `json:"status"`
 	Summary     string   `json:"summary"`

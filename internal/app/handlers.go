@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -53,7 +54,14 @@ func (s *Server) routes() {
 }
 
 func (s *Server) index(w http.ResponseWriter, r *http.Request) {
-	page := PageData{}
+	queryURL := strings.TrimSpace(r.URL.Query().Get("q"))
+	page := PageData{QueryURL: queryURL}
+	if queryURL != "" {
+		page.InputURL = queryURL
+		if result, err := s.checker.Check(r.Context(), queryURL, clientIP(r)); err == nil {
+			page.Result = &result
+		}
+	}
 	if err := s.renderPage(w, page); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -87,9 +95,7 @@ func (s *Server) check(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.renderPage(w, PageData{InputURL: input, Result: &result}); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
+	http.Redirect(w, r, "/?q="+url.QueryEscape(input), http.StatusSeeOther)
 }
 
 func (s *Server) apiCheck(w http.ResponseWriter, r *http.Request) {

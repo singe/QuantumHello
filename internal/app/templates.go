@@ -13,6 +13,7 @@ import (
 )
 
 type PageData struct {
+	QueryURL string
 	InputURL string
 	Result   *probe.Result
 }
