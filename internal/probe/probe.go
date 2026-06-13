@@ -129,6 +129,32 @@ func (c *Checker) Check(ctx context.Context, input string, clientIP string) (Res
 			sawCertRetry = true
 		}
 
+		if !control.Success && (control.ErrorClass == "connection_error" || control.ErrorClass == "no_tls13") {
+			tls12 := runTLS12Fallback(ctx, target, ip, c.roots)
+			result.TLS12Probe = tls12
+			if tls12.Success {
+				result.Status = StatusNotSupported
+				result.ControlProbe = control
+				result.TLS12Probe = tls12
+				attempts = append(attempts, attempt)
+				result.IPAttempts = append(result.IPAttempts, attempts...)
+				attachDetails(&result, attempts)
+				summarizeResult(&result)
+				c.cache.Store(target.Host+":"+target.Port, result)
+				return result, nil
+			}
+			switch tls12.ErrorClass {
+			case "timeout":
+				sawTimeout = true
+			case "connection_error":
+				sawConnErr = true
+			case "certificate_error":
+				sawCertRetry = true
+			case "no_tls13":
+				sawNoTLS13 = true
+			}
+		}
+
 		if control.Success || control.InsecureRetryPerformed {
 			pq := RunTLSProbe(ctx, target.Host, target.Port, net.IP(ip.AsSlice()), pqConfigWithRoots(target.SNI, c.roots), true)
 			attempt.PQ = pq
@@ -269,6 +295,31 @@ func (c *Checker) checkResolved(ctx context.Context, input string, target Target
 				sawConnErr = true
 			case "certificate_error":
 				sawCertRetry = true
+			}
+		}
+
+		if !control.Success && (control.ErrorClass == "connection_error" || control.ErrorClass == "no_tls13") {
+			tls12 := runTLS12Fallback(ctx, target, ip, c.roots)
+			result.TLS12Probe = tls12
+			if tls12.Success {
+				result.Status = StatusNotSupported
+				result.ControlProbe = control
+				result.TLS12Probe = tls12
+				attempts = append(attempts, attempt)
+				result.IPAttempts = attempts
+				attachDetails(&result, attempts)
+				summarizeResult(&result)
+				return result
+			}
+			switch tls12.ErrorClass {
+			case "timeout":
+				sawTimeout = true
+			case "connection_error":
+				sawConnErr = true
+			case "certificate_error":
+				sawCertRetry = true
+			case "no_tls13":
+				sawNoTLS13 = true
 			}
 		}
 		attempts = append(attempts, attempt)

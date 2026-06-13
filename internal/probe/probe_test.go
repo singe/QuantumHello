@@ -128,8 +128,11 @@ func TestCheckerCertErrorAndNoTLS13(t *testing.T) {
 
 	checker.roots = noTLSRoots
 	noTLS := checker.checkResolved(ctx, "https://example.com", Target{Normalized: "https://example.com:" + noTLSPort, Host: noTLSHost, Port: noTLSPort, SNI: noTLSHost}, []netip.Addr{noTLSIP})
-	if noTLS.Status != StatusNoTLS13 {
-		t.Fatalf("expected no_tls13, got %s (%s)", noTLS.Status, noTLS.Summary)
+	if noTLS.Status != StatusNotSupported {
+		t.Fatalf("expected not_supported, got %s (%s)", noTLS.Status, noTLS.Summary)
+	}
+	if !noTLS.TLS12Probe.Success {
+		t.Fatalf("expected tls1.2 fallback success, got %#v", noTLS.TLS12Probe)
 	}
 }
 

@@ -1,7 +1,11 @@
 package probe
 
 import (
+	"context"
+	"crypto/x509"
 	"fmt"
+	"net"
+	"net/netip"
 	"strings"
 )
 
@@ -12,7 +16,11 @@ func summarizeResult(result *Result) {
 	case StatusCertError:
 		result.Summary = "The server appears to support the requested handshake, but certificate validation failed."
 	case StatusNotSupported:
-		result.Summary = "The server supports TLS 1.3, but did not complete a handshake when this checker offered only X25519MLKEM768."
+		if result.TLS12Probe.Success {
+			result.Summary = "The server did not negotiate TLS 1.3, but it did complete a TLS 1.2 handshake."
+		} else {
+			result.Summary = "The server supports TLS 1.3, but did not complete a handshake when this checker offered only X25519MLKEM768."
+		}
 	case StatusNoTLS13:
 		result.Summary = "The server did not complete a TLS 1.3 handshake with a normal TLS 1.3 client configuration."
 	case StatusBlockedTarget:
@@ -92,6 +100,10 @@ func attachDetails(result *Result, attempts []IPAttempt) {
 		result.ControlProbe = attempts[0].Control
 		result.PQProbe = attempts[0].PQ
 	}
+}
+
+func runTLS12Fallback(ctx context.Context, target Target, ip netip.Addr, roots *x509.CertPool) TLSProbeResult {
+	return RunTLSProbe(ctx, target.Host, target.Port, net.IP(ip.AsSlice()), controlConfigTLS12WithRoots(target.SNI, roots), false)
 }
 
 func appendWarningf(warnings []string, format string, args ...any) []string {

@@ -33,6 +33,7 @@ type Result struct {
 	Summary     string   `json:"summary"`
 
 	ControlProbe TLSProbeResult `json:"control_probe"`
+	TLS12Probe   TLSProbeResult `json:"tls12_probe,omitempty"`
 	PQProbe      TLSProbeResult `json:"pq_probe"`
 	IPAttempts   []IPAttempt    `json:"ip_attempts,omitempty"`
 	Warnings     []string       `json:"warnings,omitempty"`

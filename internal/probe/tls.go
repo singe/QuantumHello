@@ -88,6 +88,21 @@ func controlConfig(host string) *tls.Config {
 	}
 }
 
+func controlConfigTLS12(host string) *tls.Config {
+	return &tls.Config{
+		ServerName:       host,
+		MinVersion:       tls.VersionTLS12,
+		MaxVersion:       tls.VersionTLS12,
+		CurvePreferences: []tls.CurveID{tls.X25519, tls.CurveP256, tls.CurveP384, tls.CurveP521},
+	}
+}
+
+func controlConfigTLS12WithRoots(host string, roots *x509.CertPool) *tls.Config {
+	cfg := controlConfigTLS12(host)
+	cfg.RootCAs = roots
+	return cfg
+}
+
 func pqConfig(host string) *tls.Config {
 	return &tls.Config{
 		ServerName:       host,
