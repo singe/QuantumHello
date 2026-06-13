@@ -3,7 +3,7 @@
   <div class="status-line">
     <span class="status-badge">{{statusIcon .Status}} {{statusLabel .Status}}</span>
   </div>
-  <h2>{{statusHeadline .Status}}</h2>
+  <!--<h2>{{statusHeadline .Status}}</h2>-->
   <p>{{.Summary}}</p>
 
   <dl class="details">
@@ -32,6 +32,22 @@
         </dl>
         <pre>{{pretty .ControlProbe}}</pre>
       </section>
+      {{if .TLS12Probe.Attempted}}
+      <section>
+        <h3>TLS 1.2 fallback</h3>
+        <dl class="probe-meta">
+          <div>
+            <dt>Outcome</dt>
+            <dd>{{if .TLS12Probe.Success}}success{{else}}{{.TLS12Probe.ErrorClass}}{{end}}</dd>
+          </div>
+          <div>
+            <dt>Negotiated curve</dt>
+            <dd>{{if .TLS12Probe.NegotiatedCurve}}{{.TLS12Probe.NegotiatedCurve}}{{else}}not negotiated{{end}}</dd>
+          </div>
+        </dl>
+        <pre>{{pretty .TLS12Probe}}</pre>
+      </section>
+      {{end}}
       <section>
         <h3>X25519MLKEM768-only probe</h3>
         <dl class="probe-meta">
