@@ -413,12 +413,13 @@ pre {
   }
 
   .hero-topbar {
-    flex-direction: column;
+    align-items: flex-start;
   }
 
   .brand {
     align-items: flex-start;
     gap: 14px;
+    flex: 1;
   }
 
   .brand-mark {
@@ -427,7 +428,15 @@ pre {
   }
 
   .api-button {
-    align-self: flex-end;
+    flex: 0 0 auto;
+    margin-left: auto;
+    width: 84px;
+    min-width: 84px;
+    max-width: 84px;
+    height: 44px;
+    padding: 0 18px;
+    font-size: 1rem;
+    line-height: 44px;
   }
 
   .input-row {
