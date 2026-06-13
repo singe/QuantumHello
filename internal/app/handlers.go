@@ -1,12 +1,10 @@
 package app
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"html/template"
-	"io/fs"
 	"net"
 	"net/http"
 	"net/url"
@@ -45,6 +43,7 @@ func (s *Server) Handler() http.Handler {
 func (s *Server) routes() {
 	s.mux.HandleFunc("/", s.index)
 	s.mux.HandleFunc("/favicon.ico", s.favicon)
+	s.mux.HandleFunc("/site.webmanifest", s.webManifest)
 	s.mux.HandleFunc("/check", s.check)
 	s.mux.HandleFunc("/api/check", s.apiCheck)
 	s.mux.HandleFunc("/healthz", s.healthz)
@@ -130,13 +129,11 @@ func (s *Server) readyz(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) favicon(w http.ResponseWriter, r *http.Request) {
-	data, err := fs.ReadFile(ui.Assets, "images/favicon.ico")
-	if err != nil {
-		http.Error(w, "favicon unavailable", http.StatusNotFound)
-		return
-	}
-	w.Header().Set("Content-Type", "image/vnd.microsoft.icon")
-	http.ServeContent(w, r, "favicon.ico", time.Now(), bytes.NewReader(data))
+	s.serveEmbeddedFile(w, r, "images/favicon.ico", "image/x-icon")
+}
+
+func (s *Server) webManifest(w http.ResponseWriter, r *http.Request) {
+	s.serveEmbeddedFile(w, r, "site.webmanifest", "application/manifest+json")
 }
 
 func (s *Server) renderPage(w http.ResponseWriter, data PageData) error {
@@ -199,4 +196,9 @@ func trustedProxy(remoteAddr string) bool {
 
 func isHXRequest(r *http.Request) bool {
 	return strings.EqualFold(r.Header.Get("HX-Request"), "true")
+}
+
+func (s *Server) serveEmbeddedFile(w http.ResponseWriter, r *http.Request, filename, contentType string) {
+	w.Header().Set("Content-Type", contentType)
+	http.ServeFileFS(w, r, ui.Assets, filename)
 }
