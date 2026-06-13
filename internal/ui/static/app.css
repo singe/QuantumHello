@@ -217,6 +217,7 @@ button:hover {
   padding: 8px 12px;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid var(--card-border);
+  height: 44px;
 }
 
 .status-supported .status-badge {
@@ -449,7 +450,16 @@ pre {
   }
 
   .status-line {
-    align-items: flex-start;
-    flex-direction: column;
+    align-items: center;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 8px;
+    justify-content: space-between;
+  }
+
+  .status-badge {
+    min-width: 0;
+    font-size: 1rem;
+    padding: 7px 10px;
   }
 }

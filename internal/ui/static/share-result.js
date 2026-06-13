@@ -1,3 +1,28 @@
+const shareBreakpoint = window.matchMedia("(max-width: 720px)");
+
+function getShareButtonLabel(button) {
+  return shareBreakpoint.matches
+    ? button.getAttribute("data-label-compact") || "Share"
+    : button.getAttribute("data-label-full") || "Share this result";
+}
+
+function syncShareButtonLabel(button) {
+  button.textContent = getShareButtonLabel(button);
+}
+
+function syncAllShareButtonLabels() {
+  document.querySelectorAll("[data-share-button]").forEach(syncShareButtonLabel);
+}
+
+function syncShareLabelsAfterHtmx(event) {
+  const target = event.detail && event.detail.target;
+  if (target) {
+    target.querySelectorAll("[data-share-button]").forEach(syncShareButtonLabel);
+    return;
+  }
+  syncAllShareButtonLabels();
+}
+
 document.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-share-button]");
   if (!button) {
@@ -11,15 +36,18 @@ document.addEventListener("click", async (event) => {
 
   try {
     await navigator.clipboard.writeText(new URL(shareUrl, window.location.origin).toString());
-    const previousText = button.textContent;
     button.textContent = "Copied";
     window.setTimeout(() => {
-      button.textContent = previousText;
+      syncShareButtonLabel(button);
     }, 1400);
   } catch (_error) {
     button.textContent = "Copy failed";
     window.setTimeout(() => {
-      button.textContent = "Share this result";
+      syncShareButtonLabel(button);
     }, 1400);
   }
 });
+
+syncAllShareButtonLabels();
+shareBreakpoint.addEventListener("change", syncAllShareButtonLabels);
+document.body.addEventListener("htmx:afterSwap", syncShareLabelsAfterHtmx);

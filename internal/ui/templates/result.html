@@ -3,7 +3,14 @@
   <div class="status-line">
     <span class="status-badge">{{statusIcon .Status}} {{statusLabel .Status}}</span>
     {{if .ShareURL}}
-    <button type="button" class="api-button" data-share-url="{{.ShareURL}}" data-share-button >Share this result</button>
+    <button
+      type="button"
+      class="api-button"
+      data-share-url="{{.ShareURL}}"
+      data-share-button
+      data-label-full="Share this result"
+      data-label-compact="Share"
+    >Share this result</button>
     {{end}}
   </div>
   <!--<h2>{{statusHeadline .Status}}</h2>-->
