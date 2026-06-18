@@ -56,6 +56,7 @@ type TLSProbeResult struct {
 	PeerCertificates       int      `json:"peer_certificates,omitempty"`
 	CertificateValid       bool     `json:"certificate_valid"`
 	CertificateError       string   `json:"certificate_error,omitempty"`
+	TransportErrorClass    string   `json:"transport_error_class,omitempty"`
 	ErrorClass             string   `json:"error_class,omitempty"`
 	Error                  string   `json:"error,omitempty"`
 	InsecureRetryPerformed bool     `json:"insecure_retry_performed"`

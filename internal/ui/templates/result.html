@@ -59,7 +59,7 @@
       </section>
       {{end}}
       <section>
-        <h3>X25519MLKEM768-only probe</h3>
+        <h3>PQ hybrid probe</h3>
         <dl class="probe-meta">
           <div>
             <dt>Offered curves</dt>
@@ -91,8 +91,14 @@
       <div class="attempt">
         <h3>{{.IP}}</h3>
         <div class="attempt-grid">
-          <pre>{{pretty .Control}}</pre>
-          <pre>{{pretty .PQ}}</pre>
+          <section>
+            <h4>Control probe</h4>
+            <pre>{{pretty .Control}}</pre>
+          </section>
+          <section>
+            <h4>PQ hybrid probe</h4>
+            <pre>{{pretty .PQ}}</pre>
+          </section>
         </div>
       </div>
     {{end}}

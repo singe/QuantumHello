@@ -101,7 +101,7 @@ func (c *Checker) Check(ctx context.Context, input string, clientIP string) (Res
 	var sawNoTLS13 bool
 	var sawTimeout bool
 	var sawConnErr bool
-	var sawPQSuccess bool
+	var sawSupportedPair bool
 	var sawControlSuccess bool
 	var sawCertRetry bool
 
@@ -131,7 +131,7 @@ func (c *Checker) Check(ctx context.Context, input string, clientIP string) (Res
 			sawCertRetry = true
 		}
 
-		if !control.Success && (control.ErrorClass == "connection_error" || control.ErrorClass == "no_tls13") {
+		if shouldAttemptTLS12Fallback(control) {
 			tls12 := runTLS12Fallback(ctx, target, ip, c.roots)
 			result.TLS12Probe = tls12
 			if tls12.Success {
@@ -160,8 +160,8 @@ func (c *Checker) Check(ctx context.Context, input string, clientIP string) (Res
 		if control.Success || control.InsecureRetryPerformed {
 			pq := RunTLSProbe(ctx, target.Host, target.Port, net.IP(ip.AsSlice()), pqConfigWithRoots(target.SNI, c.roots), true)
 			attempt.PQ = pq
-			if pq.Success {
-				sawPQSuccess = true
+			if pq.Success && supportsPQHybridPair(control, pq) {
+				sawSupportedPair = true
 			}
 			if pq.InsecureRetryPerformed {
 				sawCertRetry = true
@@ -178,19 +178,21 @@ func (c *Checker) Check(ctx context.Context, input string, clientIP string) (Res
 			}
 			attempts = append(attempts, attempt)
 			if pq.Success {
-				result.ControlProbe = control
-				result.PQProbe = pq
-				result.IPAttempts = append(result.IPAttempts, attempts...)
-				if sawCertRetry {
-					result.Status = StatusCertError
-				} else if sawControlSuccess && sawPQSuccess {
-					result.Status = StatusSupported
-				} else {
-					result.Status = StatusSupported
+				if supportsPQHybridPair(control, pq) {
+					sawSupportedPair = true
+					result.ControlProbe = control
+					result.PQProbe = pq
+					result.IPAttempts = append(result.IPAttempts, attempts...)
+					if sawCertRetry {
+						result.Status = StatusCertError
+					} else {
+						result.Status = StatusSupported
+					}
+					summarizeResult(&result)
+					c.cache.Store(target.Host+":"+target.Port, result)
+					return result, nil
 				}
-				summarizeResult(&result)
-				c.cache.Store(target.Host+":"+target.Port, result)
-				return result, nil
+				continue
 			}
 			continue
 		}
@@ -202,6 +204,8 @@ func (c *Checker) Check(ctx context.Context, input string, clientIP string) (Res
 	attachDetails(&result, attempts)
 	if sawCertRetry {
 		result.Status = StatusCertError
+	} else if sawSupportedPair {
+		result.Status = StatusSupported
 	} else if sawControlSuccess {
 		result.Status = StatusNotSupported
 	} else if sawNoTLS13 {
@@ -252,9 +256,11 @@ func (c *Checker) checkResolved(ctx context.Context, input string, target Target
 	var sawNoTLS13 bool
 	var sawTimeout bool
 	var sawConnErr bool
-	var sawPQSuccess bool
+	var sawSupportedPair bool
 	var sawControlSuccess bool
 	var sawCertRetry bool
+	var supportedControl TLSProbeResult
+	var supportedPQ TLSProbeResult
 
 	for i, ip := range ips {
 		if i >= c.maxIPs {
@@ -283,8 +289,10 @@ func (c *Checker) checkResolved(ctx context.Context, input string, target Target
 		if control.Success || control.InsecureRetryPerformed {
 			pq := RunTLSProbe(ctx, target.Host, target.Port, net.IP(ip.AsSlice()), pqConfigWithRoots(target.SNI, c.roots), true)
 			attempt.PQ = pq
-			if pq.Success {
-				sawPQSuccess = true
+			if pq.Success && supportsPQHybridPair(control, pq) {
+				sawSupportedPair = true
+				supportedControl = control
+				supportedPQ = pq
 			}
 			if pq.InsecureRetryPerformed {
 				sawCertRetry = true
@@ -301,7 +309,7 @@ func (c *Checker) checkResolved(ctx context.Context, input string, target Target
 			}
 		}
 
-		if !control.Success && (control.ErrorClass == "connection_error" || control.ErrorClass == "no_tls13") {
+		if shouldAttemptTLS12Fallback(control) {
 			tls12 := runTLS12Fallback(ctx, target, ip, c.roots)
 			result.TLS12Probe = tls12
 			if tls12.Success {
@@ -332,7 +340,9 @@ func (c *Checker) checkResolved(ctx context.Context, input string, target Target
 	attachDetails(&result, attempts)
 	if sawCertRetry {
 		result.Status = StatusCertError
-	} else if sawControlSuccess && sawPQSuccess {
+	} else if sawSupportedPair {
+		result.ControlProbe = supportedControl
+		result.PQProbe = supportedPQ
 		result.Status = StatusSupported
 	} else if sawControlSuccess {
 		result.Status = StatusNotSupported
@@ -355,4 +365,14 @@ func (c *Checker) MarshalJSON() ([]byte, error) {
 	}{
 		MaxIPs: c.maxIPs,
 	})
+}
+
+func shouldAttemptTLS12Fallback(control TLSProbeResult) bool {
+	if control.Success {
+		return false
+	}
+	if control.TransportErrorClass == "refused" {
+		return false
+	}
+	return control.ErrorClass == "connection_error" || control.ErrorClass == "no_tls13"
 }

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -26,7 +27,12 @@ func RunTLSProbe(ctx context.Context, host, port string, ip net.IP, cfg *tls.Con
 
 	rawConn, err := dialer.DialContext(ctx, "tcp", address)
 	if err != nil {
-		result.ErrorClass = classifyNetError(err)
+		result.TransportErrorClass = classifyTransportError(err)
+		if result.TransportErrorClass == "timeout" {
+			result.ErrorClass = "timeout"
+		} else {
+			result.ErrorClass = "connection_error"
+		}
 		result.Error = err.Error()
 		return result
 	}
@@ -108,19 +114,7 @@ func pqConfig(host string) *tls.Config {
 		ServerName:       host,
 		MinVersion:       tls.VersionTLS13,
 		MaxVersion:       tls.VersionTLS13,
-		CurvePreferences: []tls.CurveID{tls.X25519MLKEM768},
-	}
-}
-
-func defaultCurvePreferences() []tls.CurveID {
-	return []tls.CurveID{
-		tls.X25519MLKEM768,
-		tls.SecP256r1MLKEM768,
-		tls.SecP384r1MLKEM1024,
-		tls.X25519,
-		tls.CurveP256,
-		tls.CurveP384,
-		tls.CurveP521,
+		CurvePreferences: pqCurvePreferences(),
 	}
 }
 
@@ -170,12 +164,18 @@ func tlsVersionString(v uint16) string {
 	}
 }
 
-func classifyNetError(err error) string {
+func classifyTransportError(err error) string {
 	if err == nil {
 		return ""
 	}
 	if isTimeoutError(err) {
 		return "timeout"
+	}
+	if errors.Is(err, syscall.ECONNREFUSED) {
+		return "refused"
+	}
+	if strings.Contains(strings.ToLower(err.Error()), "connection refused") {
+		return "refused"
 	}
 	return "connection_error"
 }

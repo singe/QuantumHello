@@ -84,8 +84,45 @@ func TestLimiter(t *testing.T) {
 	}
 }
 
+func TestCurvePreferences(t *testing.T) {
+	wantControl := []string{"X25519MLKEM768", "SecP256r1MLKEM768", "SecP384r1MLKEM1024", "X25519", "CurveP256", "CurveP384", "CurveP521"}
+	if got := offeredCurveNames(controlConfig("example.com")); !sameStrings(got, wantControl) {
+		t.Fatalf("control curve order mismatch:\n got: %#v\nwant: %#v", got, wantControl)
+	}
+
+	wantPQ := []string{"X25519MLKEM768", "SecP256r1MLKEM768", "SecP384r1MLKEM1024"}
+	if got := offeredCurveNames(pqConfig("example.com")); !sameStrings(got, wantPQ) {
+		t.Fatalf("pq curve order mismatch:\n got: %#v\nwant: %#v", got, wantPQ)
+	}
+}
+
+func TestPQHybridSupportPair(t *testing.T) {
+	control := TLSProbeResult{NegotiatedCurve: tls.SecP256r1MLKEM768.String()}
+	pq := TLSProbeResult{NegotiatedCurve: tls.SecP384r1MLKEM1024.String()}
+	if !supportsPQHybridPair(control, pq) {
+		t.Fatalf("expected mixed ML-KEM hybrids to count as supported")
+	}
+
+	control = TLSProbeResult{NegotiatedCurve: tls.X25519.String()}
+	if supportsPQHybridPair(control, pq) {
+		t.Fatalf("expected classic curve to not count as supported")
+	}
+}
+
+func TestShouldAttemptTLS12Fallback(t *testing.T) {
+	if shouldAttemptTLS12Fallback(TLSProbeResult{ErrorClass: "connection_error", TransportErrorClass: "refused"}) {
+		t.Fatalf("expected refused ports to skip TLS 1.2 fallback")
+	}
+	if !shouldAttemptTLS12Fallback(TLSProbeResult{ErrorClass: "connection_error"}) {
+		t.Fatalf("expected handshake failures to try TLS 1.2 fallback")
+	}
+	if !shouldAttemptTLS12Fallback(TLSProbeResult{ErrorClass: "no_tls13"}) {
+		t.Fatalf("expected no_tls13 to try TLS 1.2 fallback")
+	}
+}
+
 func TestCheckerScansSupportedAndNotSupported(t *testing.T) {
-	supportedHost, supportedPort, supportedIP, supportedRoots, supportedCleanup := startTLSServer(t, []tls.CurveID{tls.X25519, tls.X25519MLKEM768}, tls.VersionTLS13, tls.VersionTLS13)
+	supportedHost, supportedPort, supportedIP, supportedRoots, supportedCleanup := startTLSServer(t, []tls.CurveID{tls.SecP384r1MLKEM1024}, tls.VersionTLS13, tls.VersionTLS13)
 	defer supportedCleanup()
 
 	unsupportedHost, unsupportedPort, unsupportedIP, unsupportedRoots, unsupportedCleanup := startTLSServer(t, []tls.CurveID{tls.X25519}, tls.VersionTLS13, tls.VersionTLS13)
@@ -109,7 +146,7 @@ func TestCheckerScansSupportedAndNotSupported(t *testing.T) {
 }
 
 func TestCheckerCertErrorAndNoTLS13(t *testing.T) {
-	certHost, certPort, certIP, certRoots, certCleanup := startTLSServer(t, []tls.CurveID{tls.X25519, tls.X25519MLKEM768}, tls.VersionTLS13, tls.VersionTLS13)
+	certHost, certPort, certIP, certRoots, certCleanup := startTLSServer(t, []tls.CurveID{tls.X25519MLKEM768}, tls.VersionTLS13, tls.VersionTLS13)
 	defer certCleanup()
 
 	noTLSHost, noTLSPort, noTLSIP, noTLSRoots, noTLSCleanup := startTLSServer(t, []tls.CurveID{tls.X25519}, tls.VersionTLS12, tls.VersionTLS12)
@@ -134,6 +171,18 @@ func TestCheckerCertErrorAndNoTLS13(t *testing.T) {
 	if !noTLS.TLS12Probe.Success {
 		t.Fatalf("expected tls1.2 fallback success, got %#v", noTLS.TLS12Probe)
 	}
+}
+
+func sameStrings(got, want []string) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for i := range got {
+		if got[i] != want[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func startTLSServer(t *testing.T, curves []tls.CurveID, minVersion uint16, maxVersion uint16) (string, string, netip.Addr, *x509.CertPool, func()) {

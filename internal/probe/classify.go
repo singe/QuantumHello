@@ -6,20 +6,19 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
-	"strings"
 )
 
 func summarizeResult(result *Result) {
 	switch result.Status {
 	case StatusSupported:
-		result.Summary = "The server completed a TLS 1.3 handshake when this checker offered only X25519MLKEM768."
+		result.Summary = "The server completed TLS 1.3 handshakes and negotiated supported ML-KEM hybrids on both probes."
 	case StatusCertError:
 		result.Summary = "The server appears to support the requested handshake, but certificate validation failed."
 	case StatusNotSupported:
 		if result.TLS12Probe.Success {
 			result.Summary = "The server did not negotiate TLS 1.3, but it did complete a TLS 1.2 handshake."
 		} else {
-			result.Summary = "The server supports TLS 1.3, but did not complete a handshake when this checker offered only X25519MLKEM768."
+			result.Summary = "The server completed TLS 1.3, but the probes did not both negotiate a supported ML-KEM hybrid."
 		}
 	case StatusNoTLS13:
 		result.Summary = "The server did not complete a TLS 1.3 handshake with a normal TLS 1.3 client configuration."
@@ -34,64 +33,8 @@ func summarizeResult(result *Result) {
 	case StatusConnectionErr:
 		result.Summary = "The checker could not complete a TLS probe due to a connection problem."
 	default:
-		result.Summary = "The checker could not determine TLS 1.3 + X25519MLKEM768 support."
+		result.Summary = "The checker could not determine ML-KEM hybrid support."
 	}
-}
-
-func classifyOverall(statuses []TLSProbeResult, warnings []string) Status {
-	var (
-		hasControlSuccess bool
-		hasPQSuccess      bool
-		hasCertRetry      bool
-		hasNoTLS13        bool
-		hasTimeout        bool
-		hasConnErr        bool
-	)
-
-	for _, probe := range statuses {
-		if probe.Success {
-			hasControlSuccess = true
-		}
-		if probe.InsecureRetryPerformed {
-			hasCertRetry = true
-		}
-		switch probe.ErrorClass {
-		case "timeout":
-			hasTimeout = true
-		case "no_tls13":
-			hasNoTLS13 = true
-		case "connection_error":
-			hasConnErr = true
-		case "certificate_error":
-			hasCertRetry = true
-		}
-	}
-
-	for _, w := range warnings {
-		if strings.Contains(strings.ToLower(w), "blocked") {
-			return StatusBlockedTarget
-		}
-	}
-
-	if hasCertRetry {
-		return StatusCertError
-	}
-	if hasControlSuccess && hasPQSuccess {
-		return StatusSupported
-	}
-	if hasControlSuccess {
-		return StatusNotSupported
-	}
-	if hasNoTLS13 {
-		return StatusNoTLS13
-	}
-	if hasTimeout {
-		return StatusTimeout
-	}
-	if hasConnErr {
-		return StatusConnectionErr
-	}
-	return StatusUnknown
 }
 
 func attachDetails(result *Result, attempts []IPAttempt) {

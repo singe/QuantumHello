@@ -24,7 +24,7 @@
             <img class="brand-logo" src="/images/logo.png" alt="QuantumHello logo" width="144" height="144">
           </div>
           <div>
-            <div class="eyebrow">TLS 1.3 + X25519MLKEM768 checker by @singe</div>
+            <div class="eyebrow">Post-Quantum TLS 1.3 + hybrid ML-KEM checker by @singe</div>
             <h1>QuantumHello</h1>
           </div>
         </div>
@@ -36,7 +36,7 @@
           aria-controls="api-dialog"
         >API</button>
       </div>
-      <p>Enter a hostname or HTTPS URL to check for post-quantum encryption support. The checker proves support by offering only <code>X25519MLKEM768</code> in a TLS 1.3 handshake.</p>
+      <p>Enter a hostname or HTTPS URL to check for post-quantum encryption support. The checker proves support by negotiating a supported ML-KEM hybrid key exchange in TLS 1.3 handshakes.</p>
     </header>
     <main>
       {{block "content" .}}{{end}}
@@ -54,21 +54,21 @@
 
       <div class="api-dialog-body">
         <p>Request:</p>
-        <pre><code>curl 'https://your-app.fly.dev/api/check?url=cloudflare.com'</code></pre>
+        <pre><code>curl 'https://quantumhello.xyz/api/check?url=cloudflare.com'</code></pre>
 
         <p>Response:</p>
         <pre><code>{
   "status": "supported",
   "control_probe": {
     "offered_curves": ["X25519MLKEM768", "SecP256r1MLKEM768", "SecP384r1MLKEM1024", "X25519", "CurveP256", "CurveP384", "CurveP521"],
-    "negotiated_curve": "X25519MLKEM768"
+    "negotiated_curve": "SecP256r1MLKEM768"
   },
   "pq_probe": {
-    "offered_curves": ["X25519MLKEM768"],
-    "negotiated_curve": "X25519MLKEM768"
+    "offered_curves": ["X25519MLKEM768", "SecP256r1MLKEM768", "SecP384r1MLKEM1024"],
+    "negotiated_curve": "SecP384r1MLKEM1024"
   }
 }</code></pre>
-        <p class="api-note">Replace the host with any HTTPS hostname you want to check.</p>
+        <p class="api-note">Replace the host with any HTTPS hostname you want to check. Support means both probes negotiated an ML-KEM hybrid, not necessarily the same one.</p>
       </div>
     </form>
   </dialog>
