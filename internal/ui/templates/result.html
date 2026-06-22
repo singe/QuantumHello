@@ -21,7 +21,7 @@
     <div><dt>Port</dt><dd>{{.Port}}</dd></div>
     <div><dt>SNI</dt><dd>{{.SNI}}</dd></div>
     {{if .ResolvedIPs}}
-    <div><dt>Resolved IPs</dt><dd>{{range $i, $ip := .ResolvedIPs}}{{if $i}}, {{end}}{{$ip}}{{end}}</dd></div>
+    <div><dt>Resolved IPs</dt><dd>{{range $i, $ip := .ResolvedIPs}}{{if $i}}, {{end}}{{if eq $ip $.CheckedIP}}<mark class="resolved-ip resolved-ip--checked" title="Checked address">{{$ip}}</mark>{{else}}{{$ip}}{{end}}{{end}}</dd></div>
     {{end}}
   </dl>
 
@@ -37,25 +37,25 @@
           </div>
           <div>
             <dt>Negotiated curve</dt>
-            <dd>{{if .ControlProbe.NegotiatedCurve}}{{.ControlProbe.NegotiatedCurve}}{{else}}not negotiated{{end}}</dd>
+            <dd>{{if .ControlProbe.NegotiatedCurve}}<span class="curve-result curve-result--ok">{{.ControlProbe.NegotiatedCurve}}</span>{{else}}<span class="curve-result curve-result--missing">not negotiated</span>{{end}}</dd>
           </div>
         </dl>
-        <pre>{{pretty .ControlProbe}}</pre>
+        <pre>{{prettyProbe $.CheckedIP .ControlProbe}}</pre>
       </section>
       {{if .TLS12Probe.Attempted}}
       <section>
         <h3>TLS 1.2 fallback</h3>
         <dl class="probe-meta">
           <div>
-            <dt>Outcome</dt>
-            <dd>{{if .TLS12Probe.Success}}success{{else}}{{.TLS12Probe.ErrorClass}}{{end}}</dd>
+            <dt>Offered curves</dt>
+            <dd>{{if .TLS12Probe.OfferedCurves}}{{range $i, $curve := .TLS12Probe.OfferedCurves}}{{if $i}}, {{end}}{{$curve}}{{end}}{{else}}none recorded{{end}}</dd>
           </div>
           <div>
             <dt>Negotiated curve</dt>
-            <dd>{{if .TLS12Probe.NegotiatedCurve}}{{.TLS12Probe.NegotiatedCurve}}{{else}}not negotiated{{end}}</dd>
+            <dd>{{if .TLS12Probe.NegotiatedCurve}}<span class="curve-result curve-result--ok">{{.TLS12Probe.NegotiatedCurve}}</span>{{else}}<span class="curve-result curve-result--missing">not negotiated</span>{{end}}</dd>
           </div>
         </dl>
-        <pre>{{pretty .TLS12Probe}}</pre>
+        <pre>{{prettyProbe $.CheckedIP .TLS12Probe}}</pre>
       </section>
       {{end}}
       <section>
@@ -67,10 +67,10 @@
           </div>
           <div>
             <dt>Negotiated curve</dt>
-            <dd>{{if .PQProbe.NegotiatedCurve}}{{.PQProbe.NegotiatedCurve}}{{else}}not negotiated{{end}}</dd>
+            <dd>{{if .PQProbe.NegotiatedCurve}}<span class="curve-result curve-result--ok">{{.PQProbe.NegotiatedCurve}}</span>{{else}}<span class="curve-result curve-result--missing">not negotiated</span>{{end}}</dd>
           </div>
         </dl>
-        <pre>{{pretty .PQProbe}}</pre>
+        <pre>{{prettyProbe $.CheckedIP .PQProbe}}</pre>
       </section>
     </div>
   </details>
@@ -82,27 +82,6 @@
       {{range .Warnings}}<li>{{.}}</li>{{end}}
     </ul>
   </div>
-  {{end}}
-
-  {{if .IPAttempts}}
-  <details>
-    <summary>Per-IP attempts</summary>
-    {{range .IPAttempts}}
-      <div class="attempt">
-        <h3>{{.IP}}</h3>
-        <div class="attempt-grid">
-          <section>
-            <h4>Control probe</h4>
-            <pre>{{pretty .Control}}</pre>
-          </section>
-          <section>
-            <h4>PQ hybrid probe</h4>
-            <pre>{{pretty .PQ}}</pre>
-          </section>
-        </div>
-      </div>
-    {{end}}
-  </details>
   {{end}}
 </article>
 {{end}}

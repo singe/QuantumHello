@@ -3,7 +3,6 @@ package probe
 import (
 	"context"
 	"crypto/x509"
-	"fmt"
 	"net"
 	"net/netip"
 )
@@ -11,17 +10,17 @@ import (
 func summarizeResult(result *Result) {
 	switch result.Status {
 	case StatusSupported:
-		result.Summary = "The server completed TLS 1.3 handshakes and negotiated supported ML-KEM hybrids on both probes."
+		result.Summary = "The checked address completed TLS 1.3 and negotiated a supported ML-KEM hybrid."
 	case StatusCertError:
-		result.Summary = "The server appears to support the requested handshake, but certificate validation failed."
+		result.Summary = "The checked address appears to support the requested handshake, but certificate validation failed."
 	case StatusNotSupported:
 		if result.TLS12Probe.Success {
-			result.Summary = "The server did not negotiate TLS 1.3, but it did complete a TLS 1.2 handshake."
+			result.Summary = "The checked address did not negotiate TLS 1.3, but it did complete a TLS 1.2 handshake."
 		} else {
-			result.Summary = "The server completed TLS 1.3, but the probes did not both negotiate a supported ML-KEM hybrid."
+			result.Summary = "The checked address completed TLS 1.3, but the probes did not negotiate a supported ML-KEM hybrid."
 		}
 	case StatusNoTLS13:
-		result.Summary = "The server did not complete a TLS 1.3 handshake with a normal TLS 1.3 client configuration."
+		result.Summary = "The checked address did not complete a TLS 1.3 handshake with a normal TLS 1.3 client configuration."
 	case StatusBlockedTarget:
 		result.Summary = "This hostname resolved to an address range that this checker is not allowed to scan."
 	case StatusDNSError:
@@ -37,18 +36,6 @@ func summarizeResult(result *Result) {
 	}
 }
 
-func attachDetails(result *Result, attempts []IPAttempt) {
-	result.IPAttempts = attempts
-	if len(attempts) > 0 {
-		result.ControlProbe = attempts[0].Control
-		result.PQProbe = attempts[0].PQ
-	}
-}
-
 func runTLS12Fallback(ctx context.Context, target Target, ip netip.Addr, roots *x509.CertPool) TLSProbeResult {
 	return RunTLSProbe(ctx, target.Host, target.Port, net.IP(ip.AsSlice()), controlConfigTLS12WithRoots(target.SNI, roots), false)
-}
-
-func appendWarningf(warnings []string, format string, args ...any) []string {
-	return append(warnings, fmt.Sprintf(format, args...))
 }

@@ -1,6 +1,6 @@
 # QuantumHello
 
-QuantumHello checks whether a host can negotiate TLS 1.3 with `X25519MLKEM768`.
+QuantumHello checks whether a host can negotiate TLS 1.3 with a supported ML-KEM hybrid, including `X25519MLKEM768`, `SecP256r1MLKEM768`, and `SecP384r1MLKEM1024`.
 
 ## Run locally
 

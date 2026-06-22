@@ -5,7 +5,6 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net"
 	"net/netip"
 	"net/url"
@@ -92,132 +91,7 @@ func (c *Checker) Check(ctx context.Context, input string, clientIP string) (Res
 		return result, nil
 	}
 
-	for _, ip := range safeIPs {
-		result.ResolvedIPs = append(result.ResolvedIPs, ip.String())
-	}
-	result.Warnings = append(result.Warnings, warnings...)
-
-	attempts := make([]IPAttempt, 0, len(safeIPs))
-	var sawNoTLS13 bool
-	var sawTimeout bool
-	var sawConnErr bool
-	var sawSupportedPair bool
-	var sawControlSuccess bool
-	var sawCertRetry bool
-
-	for i, ip := range safeIPs {
-		if i >= c.maxIPs {
-			result.Warnings = append(result.Warnings, fmt.Sprintf("Only the first %d safe addresses were tested", c.maxIPs))
-			break
-		}
-
-		attempt := IPAttempt{IP: ip.String()}
-		control := RunTLSProbe(ctx, target.Host, target.Port, net.IP(ip.AsSlice()), controlConfigWithRoots(target.SNI, c.roots), true)
-		attempt.Control = control
-		if control.Success {
-			sawControlSuccess = true
-		}
-		if control.InsecureRetryPerformed {
-			sawCertRetry = true
-		}
-		switch control.ErrorClass {
-		case "timeout":
-			sawTimeout = true
-		case "no_tls13":
-			sawNoTLS13 = true
-		case "connection_error":
-			sawConnErr = true
-		case "certificate_error":
-			sawCertRetry = true
-		}
-
-		if shouldAttemptTLS12Fallback(control) {
-			tls12 := runTLS12Fallback(ctx, target, ip, c.roots)
-			result.TLS12Probe = tls12
-			if tls12.Success {
-				result.Status = StatusNotSupported
-				result.ControlProbe = control
-				result.TLS12Probe = tls12
-				attempts = append(attempts, attempt)
-				result.IPAttempts = append(result.IPAttempts, attempts...)
-				attachDetails(&result, attempts)
-				summarizeResult(&result)
-				c.cache.Store(target.Host+":"+target.Port, result)
-				return result, nil
-			}
-			switch tls12.ErrorClass {
-			case "timeout":
-				sawTimeout = true
-			case "connection_error":
-				sawConnErr = true
-			case "certificate_error":
-				sawCertRetry = true
-			case "no_tls13":
-				sawNoTLS13 = true
-			}
-		}
-
-		if control.Success || control.InsecureRetryPerformed {
-			pq := RunTLSProbe(ctx, target.Host, target.Port, net.IP(ip.AsSlice()), pqConfigWithRoots(target.SNI, c.roots), true)
-			attempt.PQ = pq
-			if pq.Success && supportsPQHybridPair(control, pq) {
-				sawSupportedPair = true
-			}
-			if pq.InsecureRetryPerformed {
-				sawCertRetry = true
-			}
-			switch pq.ErrorClass {
-			case "timeout":
-				sawTimeout = true
-			case "no_tls13":
-				sawNoTLS13 = true
-			case "connection_error":
-				sawConnErr = true
-			case "certificate_error":
-				sawCertRetry = true
-			}
-			attempts = append(attempts, attempt)
-			if pq.Success {
-				if supportsPQHybridPair(control, pq) {
-					sawSupportedPair = true
-					result.ControlProbe = control
-					result.PQProbe = pq
-					result.IPAttempts = append(result.IPAttempts, attempts...)
-					if sawCertRetry {
-						result.Status = StatusCertError
-					} else {
-						result.Status = StatusSupported
-					}
-					summarizeResult(&result)
-					c.cache.Store(target.Host+":"+target.Port, result)
-					return result, nil
-				}
-				continue
-			}
-			continue
-		}
-
-		attempts = append(attempts, attempt)
-	}
-
-	result.IPAttempts = append(result.IPAttempts, attempts...)
-	attachDetails(&result, attempts)
-	if sawCertRetry {
-		result.Status = StatusCertError
-	} else if sawSupportedPair {
-		result.Status = StatusSupported
-	} else if sawControlSuccess {
-		result.Status = StatusNotSupported
-	} else if sawNoTLS13 {
-		result.Status = StatusNoTLS13
-	} else if sawTimeout {
-		result.Status = StatusTimeout
-	} else if sawConnErr {
-		result.Status = StatusConnectionErr
-	} else {
-		result.Status = StatusUnknown
-	}
-	summarizeResult(&result)
+	result = c.checkResolvedWithWarnings(ctx, input, target, safeIPs, warnings)
 	c.cache.Store(target.Host+":"+target.Port, result)
 	return result, nil
 }
@@ -239,6 +113,10 @@ func (c *Checker) release() {
 }
 
 func (c *Checker) checkResolved(ctx context.Context, input string, target Target, ips []netip.Addr) Result {
+	return c.checkResolvedWithWarnings(ctx, input, target, ips, nil)
+}
+
+func (c *Checker) checkResolvedWithWarnings(ctx context.Context, input string, target Target, ips []netip.Addr, warnings []string) Result {
 	result := Result{
 		InputURL:    input,
 		Normalized:  target.Normalized,
@@ -251,8 +129,18 @@ func (c *Checker) checkResolved(ctx context.Context, input string, target Target
 	for _, ip := range ips {
 		result.ResolvedIPs = append(result.ResolvedIPs, ip.String())
 	}
+	result.Warnings = append(result.Warnings, warnings...)
+	if len(ips) > 1 {
+		result.Warnings = append(result.Warnings, "Multiple safe addresses were resolved; only the first safe address was checked")
+	}
 
-	attempts := make([]IPAttempt, 0, len(ips))
+	if len(ips) == 0 {
+		result.Status = StatusUnknown
+		summarizeResult(&result)
+		return result
+	}
+
+	attempts := make([]IPAttempt, 0, 1)
 	var sawNoTLS13 bool
 	var sawTimeout bool
 	var sawConnErr bool
@@ -262,21 +150,39 @@ func (c *Checker) checkResolved(ctx context.Context, input string, target Target
 	var supportedControl TLSProbeResult
 	var supportedPQ TLSProbeResult
 
-	for i, ip := range ips {
-		if i >= c.maxIPs {
-			result.Warnings = append(result.Warnings, fmt.Sprintf("Only the first %d safe addresses were tested", c.maxIPs))
-			break
+	ip := ips[0]
+	result.CheckedIP = ip.String()
+	attempt := IPAttempt{IP: ip.String()}
+	control := RunTLSProbe(ctx, target.Host, target.Port, net.IP(ip.AsSlice()), controlConfigWithRoots(target.SNI, c.roots), true)
+	attempt.Control = control
+	if control.Success {
+		sawControlSuccess = true
+	}
+	if control.InsecureRetryPerformed {
+		sawCertRetry = true
+	}
+	switch control.ErrorClass {
+	case "timeout":
+		sawTimeout = true
+	case "no_tls13":
+		sawNoTLS13 = true
+	case "connection_error":
+		sawConnErr = true
+	case "certificate_error":
+		sawCertRetry = true
+	}
+	if control.Success || control.InsecureRetryPerformed {
+		pq := RunTLSProbe(ctx, target.Host, target.Port, net.IP(ip.AsSlice()), pqConfigWithRoots(target.SNI, c.roots), true)
+		attempt.PQ = pq
+		if pq.Success && supportsPQHybridPair(control, pq) {
+			sawSupportedPair = true
+			supportedControl = control
+			supportedPQ = pq
 		}
-		attempt := IPAttempt{IP: ip.String()}
-		control := RunTLSProbe(ctx, target.Host, target.Port, net.IP(ip.AsSlice()), controlConfigWithRoots(target.SNI, c.roots), true)
-		attempt.Control = control
-		if control.Success {
-			sawControlSuccess = true
-		}
-		if control.InsecureRetryPerformed {
+		if pq.InsecureRetryPerformed {
 			sawCertRetry = true
 		}
-		switch control.ErrorClass {
+		switch pq.ErrorClass {
 		case "timeout":
 			sawTimeout = true
 		case "no_tls13":
@@ -286,58 +192,36 @@ func (c *Checker) checkResolved(ctx context.Context, input string, target Target
 		case "certificate_error":
 			sawCertRetry = true
 		}
-		if control.Success || control.InsecureRetryPerformed {
-			pq := RunTLSProbe(ctx, target.Host, target.Port, net.IP(ip.AsSlice()), pqConfigWithRoots(target.SNI, c.roots), true)
-			attempt.PQ = pq
-			if pq.Success && supportsPQHybridPair(control, pq) {
-				sawSupportedPair = true
-				supportedControl = control
-				supportedPQ = pq
-			}
-			if pq.InsecureRetryPerformed {
-				sawCertRetry = true
-			}
-			switch pq.ErrorClass {
-			case "timeout":
-				sawTimeout = true
-			case "no_tls13":
-				sawNoTLS13 = true
-			case "connection_error":
-				sawConnErr = true
-			case "certificate_error":
-				sawCertRetry = true
-			}
-		}
-
-		if shouldAttemptTLS12Fallback(control) {
-			tls12 := runTLS12Fallback(ctx, target, ip, c.roots)
-			result.TLS12Probe = tls12
-			if tls12.Success {
-				result.Status = StatusNotSupported
-				result.ControlProbe = control
-				result.TLS12Probe = tls12
-				attempts = append(attempts, attempt)
-				result.IPAttempts = attempts
-				attachDetails(&result, attempts)
-				summarizeResult(&result)
-				return result
-			}
-			switch tls12.ErrorClass {
-			case "timeout":
-				sawTimeout = true
-			case "connection_error":
-				sawConnErr = true
-			case "certificate_error":
-				sawCertRetry = true
-			case "no_tls13":
-				sawNoTLS13 = true
-			}
-		}
-		attempts = append(attempts, attempt)
 	}
 
+	if shouldAttemptTLS12Fallback(control) {
+		tls12 := runTLS12Fallback(ctx, target, ip, c.roots)
+		result.TLS12Probe = tls12
+		if tls12.Success {
+			result.Status = StatusNotSupported
+			result.ControlProbe = control
+			result.TLS12Probe = tls12
+			result.IPAttempts = []IPAttempt{attempt}
+			result.Warnings = append(result.Warnings, warnings...)
+			summarizeResult(&result)
+			return result
+		}
+		switch tls12.ErrorClass {
+		case "timeout":
+			sawTimeout = true
+		case "connection_error":
+			sawConnErr = true
+		case "certificate_error":
+			sawCertRetry = true
+		case "no_tls13":
+			sawNoTLS13 = true
+		}
+	}
+	attempts = append(attempts, attempt)
+
 	result.IPAttempts = attempts
-	attachDetails(&result, attempts)
+	result.ControlProbe = control
+	result.PQProbe = attempt.PQ
 	if sawCertRetry {
 		result.Status = StatusCertError
 	} else if sawSupportedPair {

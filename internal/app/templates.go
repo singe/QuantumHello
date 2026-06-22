@@ -24,6 +24,7 @@ func parseTemplates() (*template.Template, error) {
 		"statusIcon":     statusIcon,
 		"statusHeadline": statusHeadline,
 		"pretty":         prettyJSON,
+		"prettyProbe":    prettyProbeJSON,
 	}
 
 	tpl := template.New("").Funcs(funcs)
@@ -104,6 +105,29 @@ func prettyJSON(v any) string {
 	b, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
 		return fmt.Sprintf("%+v", v)
+	}
+	return string(b)
+}
+
+func prettyProbeJSON(checkedIP string, v any) string {
+	if checkedIP == "" {
+		return prettyJSON(v)
+	}
+
+	raw, err := json.Marshal(v)
+	if err != nil {
+		return prettyJSON(v)
+	}
+
+	var data map[string]any
+	if err := json.Unmarshal(raw, &data); err != nil {
+		return prettyJSON(v)
+	}
+	data["checked_ip"] = checkedIP
+
+	b, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		return prettyJSON(v)
 	}
 	return string(b)
 }

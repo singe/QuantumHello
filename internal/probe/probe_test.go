@@ -7,11 +7,13 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"math/big"
 	"net"
 	"net/netip"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -142,6 +144,51 @@ func TestCheckerScansSupportedAndNotSupported(t *testing.T) {
 	notSupported := checker.checkResolved(ctx, "https://example.com", Target{Normalized: "https://example.com:" + unsupportedPort, Host: unsupportedHost, Port: unsupportedPort, SNI: unsupportedHost}, []netip.Addr{unsupportedIP})
 	if notSupported.Status != StatusNotSupported {
 		t.Fatalf("expected not_supported, got %s (%s)", notSupported.Status, notSupported.Summary)
+	}
+}
+
+func TestCheckerUsesOnlyFirstResolvedIP(t *testing.T) {
+	supportedHost, supportedPort, supportedIP, supportedRoots, supportedCleanup := startTLSServer(t, []tls.CurveID{tls.SecP256r1MLKEM768}, tls.VersionTLS13, tls.VersionTLS13)
+	defer supportedCleanup()
+
+	checker := NewChecker()
+	checker.limiter = NewLimiter(1000, 1000)
+	checker.roots = supportedRoots
+
+	ctx := context.Background()
+	result := checker.checkResolved(ctx, "https://example.com", Target{Normalized: "https://example.com:" + supportedPort, Host: supportedHost, Port: supportedPort, SNI: supportedHost}, []netip.Addr{supportedIP, netip.MustParseAddr("203.0.113.1")})
+	if result.Status != StatusSupported {
+		t.Fatalf("expected supported, got %s (%s)", result.Status, result.Summary)
+	}
+	if result.CheckedIP != supportedIP.String() {
+		t.Fatalf("expected checked ip %s, got %s", supportedIP.String(), result.CheckedIP)
+	}
+	if len(result.IPAttempts) != 1 {
+		t.Fatalf("expected only one IP attempt, got %d", len(result.IPAttempts))
+	}
+	foundWarning := false
+	for _, warning := range result.Warnings {
+		if warning == "Multiple safe addresses were resolved; only the first safe address was checked" {
+			foundWarning = true
+			break
+		}
+	}
+	if !foundWarning {
+		t.Fatalf("expected multi-IP warning, got %#v", result.Warnings)
+	}
+}
+
+func TestResultJSONOmitsIPAttempts(t *testing.T) {
+	b, err := json.Marshal(Result{
+		Status:     StatusSupported,
+		CheckedIP:  "203.0.113.10",
+		IPAttempts: []IPAttempt{{IP: "203.0.113.10"}},
+	})
+	if err != nil {
+		t.Fatalf("marshal result: %v", err)
+	}
+	if strings.Contains(string(b), "ip_attempts") {
+		t.Fatalf("expected ip_attempts to be omitted from json, got %s", string(b))
 	}
 }
 

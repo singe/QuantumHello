@@ -30,13 +30,14 @@ type Result struct {
 	SNI         string   `json:"sni"`
 	ShareURL    string   `json:"share_url,omitempty"`
 	ResolvedIPs []string `json:"resolved_ips"`
+	CheckedIP   string   `json:"checked_ip,omitempty"`
 	Status      Status   `json:"status"`
 	Summary     string   `json:"summary"`
 
 	ControlProbe TLSProbeResult `json:"control_probe"`
 	TLS12Probe   TLSProbeResult `json:"tls12_probe,omitempty"`
 	PQProbe      TLSProbeResult `json:"pq_probe"`
-	IPAttempts   []IPAttempt    `json:"ip_attempts,omitempty"`
+	IPAttempts   []IPAttempt    `json:"-"`
 	Warnings     []string       `json:"warnings,omitempty"`
 }
 
