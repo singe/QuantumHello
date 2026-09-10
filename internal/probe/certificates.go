@@ -15,9 +15,14 @@ import (
 // yet expose dedicated x509 key types.
 var (
 	mlDSAPublicKeyOIDs = map[string]string{
-		"2.16.840.1.101.3.4.4.1": "ML-DSA-44",
-		"2.16.840.1.101.3.4.4.2": "ML-DSA-65",
-		"2.16.840.1.101.3.4.4.3": "ML-DSA-87",
+		// Current ML-DSA certificates use the signature algorithm OIDs for
+		// SubjectPublicKeyInfo as well; retain the draft key OIDs for interop.
+		"2.16.840.1.101.3.4.3.17": "ML-DSA-44",
+		"2.16.840.1.101.3.4.3.18": "ML-DSA-65",
+		"2.16.840.1.101.3.4.3.19": "ML-DSA-87",
+		"2.16.840.1.101.3.4.4.1":  "ML-DSA-44",
+		"2.16.840.1.101.3.4.4.2":  "ML-DSA-65",
+		"2.16.840.1.101.3.4.4.3":  "ML-DSA-87",
 	}
 	mlDSASignatureOIDs = map[string]string{
 		"2.16.840.1.101.3.4.3.17": "ML-DSA-44",
