@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"html/template"
 	"net"
 	"net/http"
@@ -114,8 +115,40 @@ func (s *Server) apiCheck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	writeJSONResult(w, result, r.URL.Query().Get("pretty") == "1", r.URL.Query().Get("download") == "1")
+}
+
+func writeJSONResult(w http.ResponseWriter, result probe.Result, pretty, download bool) {
+	data, err := json.Marshal(result)
+	if pretty || download {
+		data, err = json.MarshalIndent(result, "", "  ")
+	}
+	if err != nil {
+		http.Error(w, "could not encode result", http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(result)
+	if download {
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"quantumhello-%s.json\"", jsonFilename(result.Host)))
+	}
+	_, _ = w.Write(append(data, '\n'))
+}
+
+func jsonFilename(host string) string {
+	host = strings.ToLower(strings.TrimSpace(host))
+	var b strings.Builder
+	for _, r := range host {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '.' || r == '-' || r == '_' {
+			b.WriteRune(r)
+		} else {
+			b.WriteByte('-')
+		}
+	}
+	name := strings.Trim(b.String(), ".-")
+	if name == "" {
+		return "result"
+	}
+	return name
 }
 
 func (s *Server) healthz(w http.ResponseWriter, _ *http.Request) {

@@ -55,9 +55,12 @@
       <div class="api-dialog-body">
         <p>Request:</p>
         <pre><code>curl 'https://quantumhello.xyz/api/check?url=cloudflare.com'</code></pre>
+        <p>Pretty-print or download the same schema with <code>&amp;pretty=1</code> or <code>&amp;download=1</code>.</p>
 
         <p>Response:</p>
 <pre><code>{
+  "schema_version": "2",
+  "grade": "good",
   "status": "supported",
   "checked_ip": "104.16.124.96",
   "control_probe": {
