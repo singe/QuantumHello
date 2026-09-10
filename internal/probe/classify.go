@@ -34,6 +34,7 @@ func summarizeResult(result *Result) {
 	default:
 		result.Summary = "The checker could not determine ML-KEM hybrid support."
 	}
+	Assess(result)
 }
 
 func runTLS12Fallback(ctx context.Context, target Target, ip netip.Addr, roots *x509.CertPool) TLSProbeResult {

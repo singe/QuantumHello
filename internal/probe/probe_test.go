@@ -111,6 +111,83 @@ func TestPQHybridSupportPair(t *testing.T) {
 	}
 }
 
+func TestAssessmentGradePolicy(t *testing.T) {
+	tests := []struct {
+		name      string
+		result    Result
+		wantGrade Grade
+		wantKEX   string
+		wantHNDL  bool
+	}{
+		{
+			name:      "good preferred",
+			result:    Result{Status: StatusSupported, ControlProbe: TLSProbeResult{Success: true, CertificateValid: true, NegotiatedCurve: tls.X25519MLKEM768.String()}},
+			wantGrade: GradeGood, wantKEX: "post_quantum_preferred", wantHNDL: true,
+		},
+		{
+			name:      "fair supported but not preferred",
+			result:    Result{Status: StatusNotSupported, ControlProbe: TLSProbeResult{Success: true, CertificateValid: true, NegotiatedCurve: tls.X25519.String()}, PQProbe: TLSProbeResult{Success: true, CertificateValid: true, NegotiatedCurve: tls.X25519MLKEM768.String()}},
+			wantGrade: GradeFair, wantKEX: "post_quantum_supported", wantHNDL: true,
+		},
+		{
+			name:      "bad unsupported",
+			result:    Result{Status: StatusNotSupported, ControlProbe: TLSProbeResult{Success: true, CertificateValid: true, NegotiatedCurve: tls.X25519.String()}},
+			wantGrade: GradeBad, wantKEX: "post_quantum_unsupported", wantHNDL: false,
+		},
+		{
+			name:      "bad tls12",
+			result:    Result{Status: StatusNotSupported, TLS12Probe: TLSProbeResult{Success: true}, ControlProbe: TLSProbeResult{CertificateValid: true}},
+			wantGrade: GradeBad,
+		},
+		{
+			name:      "bad certificate keeps PQ evidence",
+			result:    Result{Status: StatusCertError, ControlProbe: TLSProbeResult{Success: true, CertificateValid: false, NegotiatedCurve: tls.X25519MLKEM768.String()}},
+			wantGrade: GradeBad, wantKEX: "post_quantum_preferred", wantHNDL: true,
+		},
+		{
+			name:      "failed timeout",
+			result:    Result{Status: StatusTimeout, Summary: "The check timed out before it could complete."},
+			wantGrade: GradeFailed,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			Assess(&tt.result)
+			if tt.result.Grade != tt.wantGrade {
+				t.Fatalf("grade = %s, want %s", tt.result.Grade, tt.wantGrade)
+			}
+			if tt.wantKEX != "" && tt.result.Assessment.KeyEstablishment.State != tt.wantKEX {
+				t.Fatalf("kex state = %s, want %s", tt.result.Assessment.KeyEstablishment.State, tt.wantKEX)
+			}
+			if tt.result.Assessment.HNDLProtected != tt.wantHNDL {
+				t.Fatalf("hndl_protected = %t, want %t", tt.result.Assessment.HNDLProtected, tt.wantHNDL)
+			}
+			if tt.result.SchemaVersion != "2" {
+				t.Fatalf("schema version = %q, want 2", tt.result.SchemaVersion)
+			}
+		})
+	}
+}
+
+func TestObserveCertificateAndChains(t *testing.T) {
+	cert, _ := selfSignedCert(t, "example.com")
+	parsed, err := x509.ParseCertificate(cert.Certificate[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	obs := ObserveCertificate(parsed, 0, "leaf")
+	if obs.PublicKeyAlgorithm != "RSA" || obs.PublicKeyDetails != "2048-bit" {
+		t.Fatalf("unexpected public key observation: %#v", obs)
+	}
+	if obs.PublicKeyPostQuantum || obs.SignaturePostQuantum {
+		t.Fatalf("RSA certificate incorrectly classified as post-quantum: %#v", obs)
+	}
+	chain := ObservePresentedChain([]*x509.Certificate{parsed})
+	if len(chain) != 1 || chain[0].Role != "leaf" {
+		t.Fatalf("unexpected chain observation: %#v", chain)
+	}
+}
+
 func TestShouldAttemptTLS12Fallback(t *testing.T) {
 	if shouldAttemptTLS12Fallback(TLSProbeResult{ErrorClass: "connection_error", TransportErrorClass: "refused"}) {
 		t.Fatalf("expected refused ports to skip TLS 1.2 fallback")
@@ -163,18 +240,19 @@ func TestCheckerUsesOnlyFirstResolvedIP(t *testing.T) {
 	if result.CheckedIP != supportedIP.String() {
 		t.Fatalf("expected checked ip %s, got %s", supportedIP.String(), result.CheckedIP)
 	}
-	if len(result.IPAttempts) != 1 {
-		t.Fatalf("expected only one IP attempt, got %d", len(result.IPAttempts))
+	if len(result.IPAttempts) != 1 || result.IPAttempts[0].Family != "ipv4" {
+		t.Fatalf("expected one representative IPv4 attempt, got %#v", result.IPAttempts)
 	}
-	foundWarning := false
-	for _, warning := range result.Warnings {
-		if warning == "Multiple safe addresses were resolved; only the first safe address was checked" {
-			foundWarning = true
-			break
-		}
+	if result.Network.Consistency != "single_family" {
+		t.Fatalf("expected single-family network result, got %#v", result.Network)
 	}
-	if !foundWarning {
-		t.Fatalf("expected multi-IP warning, got %#v", result.Warnings)
+}
+
+func TestRepresentativeIPs(t *testing.T) {
+	ips := []netip.Addr{netip.MustParseAddr("192.0.2.10"), netip.MustParseAddr("192.0.2.11"), netip.MustParseAddr("2001:db8::10"), netip.MustParseAddr("2001:db8::11")}
+	got := RepresentativeIPs(ips)
+	if len(got) != 2 || got[0].String() != "192.0.2.10" || got[1].String() != "2001:db8::10" {
+		t.Fatalf("unexpected representatives: %#v", got)
 	}
 }
 

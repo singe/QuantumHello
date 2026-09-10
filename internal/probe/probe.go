@@ -130,9 +130,14 @@ func (c *Checker) checkResolvedWithWarnings(ctx context.Context, input string, t
 		result.ResolvedIPs = append(result.ResolvedIPs, ip.String())
 	}
 	result.Warnings = append(result.Warnings, warnings...)
-	if len(ips) > 1 {
-		result.Warnings = append(result.Warnings, "Multiple safe addresses were resolved; only the first safe address was checked")
+	for _, ip := range ips {
+		if ip.Is4() {
+			result.Network.ResolvedIPv4 = append(result.Network.ResolvedIPv4, ip.String())
+		} else if ip.Is6() {
+			result.Network.ResolvedIPv6 = append(result.Network.ResolvedIPv6, ip.String())
+		}
 	}
+	representatives := RepresentativeIPs(ips)
 
 	if len(ips) == 0 {
 		result.Status = StatusUnknown
@@ -140,94 +145,65 @@ func (c *Checker) checkResolvedWithWarnings(ctx context.Context, input string, t
 		return result
 	}
 
-	attempts := make([]IPAttempt, 0, 1)
-	var sawNoTLS13 bool
-	var sawTimeout bool
-	var sawConnErr bool
-	var sawSupportedPair bool
-	var sawControlSuccess bool
-	var sawCertRetry bool
-	var supportedControl TLSProbeResult
-	var supportedPQ TLSProbeResult
-
-	ip := ips[0]
-	result.CheckedIP = ip.String()
-	attempt := IPAttempt{IP: ip.String()}
-	control := RunTLSProbe(ctx, target.Host, target.Port, net.IP(ip.AsSlice()), controlConfigWithRoots(target.SNI, c.roots), true)
-	attempt.Control = control
-	if control.Success {
-		sawControlSuccess = true
+	type outcome struct {
+		attempt IPAttempt
+		tls12   TLSProbeResult
 	}
-	if control.InsecureRetryPerformed {
-		sawCertRetry = true
+	outcomes := make(chan outcome, len(representatives))
+	for _, ip := range representatives {
+		go func(ip netip.Addr) { a, t := c.checkIP(ctx, target, ip); outcomes <- outcome{a, t} }(ip)
 	}
-	switch control.ErrorClass {
-	case "timeout":
-		sawTimeout = true
-	case "no_tls13":
-		sawNoTLS13 = true
-	case "connection_error":
-		sawConnErr = true
-	case "certificate_error":
-		sawCertRetry = true
-	}
-	if control.Success || control.InsecureRetryPerformed {
-		pq := RunTLSProbe(ctx, target.Host, target.Port, net.IP(ip.AsSlice()), pqConfigWithRoots(target.SNI, c.roots), true)
-		attempt.PQ = pq
-		if pq.Success && supportsPQHybridPair(control, pq) {
+	var sawNoTLS13, sawTimeout, sawConnErr, sawCertRetry, sawControlSuccess, sawSupportedPair, sawTLS12 bool
+	var supportedControl, supportedPQ TLSProbeResult
+	for range representatives {
+		o := <-outcomes
+		result.IPAttempts = append(result.IPAttempts, o.attempt)
+		if o.attempt.Family == "ipv4" {
+			result.Network.TestedIPv4 = o.attempt.IP
+		} else {
+			result.Network.TestedIPv6 = o.attempt.IP
+		}
+		if o.tls12.Success {
+			sawTLS12 = true
+			result.TLS12Probe = o.tls12
+		}
+		control, pq := o.attempt.Control, o.attempt.PQ
+		if control.Success {
+			sawControlSuccess = true
+		}
+		if o.attempt.Readiness == "post_quantum_preferred" {
 			sawSupportedPair = true
-			supportedControl = control
-			supportedPQ = pq
+			supportedControl, supportedPQ = control, pq
 		}
-		if pq.InsecureRetryPerformed {
+		if control.InsecureRetryPerformed || pq.InsecureRetryPerformed || o.tls12.InsecureRetryPerformed {
 			sawCertRetry = true
 		}
-		switch pq.ErrorClass {
-		case "timeout":
-			sawTimeout = true
-		case "no_tls13":
-			sawNoTLS13 = true
-		case "connection_error":
-			sawConnErr = true
-		case "certificate_error":
-			sawCertRetry = true
+		for _, p := range []TLSProbeResult{control, pq, o.tls12} {
+			switch p.ErrorClass {
+			case "timeout":
+				sawTimeout = true
+			case "no_tls13":
+				sawNoTLS13 = true
+			case "connection_error":
+				sawConnErr = true
+			case "certificate_error":
+				sawCertRetry = true
+			}
 		}
 	}
-
-	if shouldAttemptTLS12Fallback(control) {
-		tls12 := runTLS12Fallback(ctx, target, ip, c.roots)
-		result.TLS12Probe = tls12
-		if tls12.Success {
-			result.Status = StatusNotSupported
-			result.ControlProbe = control
-			result.TLS12Probe = tls12
-			result.IPAttempts = []IPAttempt{attempt}
-			result.Warnings = append(result.Warnings, warnings...)
-			summarizeResult(&result)
-			return result
-		}
-		switch tls12.ErrorClass {
-		case "timeout":
-			sawTimeout = true
-		case "connection_error":
-			sawConnErr = true
-		case "certificate_error":
-			sawCertRetry = true
-		case "no_tls13":
-			sawNoTLS13 = true
-		}
+	if len(result.IPAttempts) > 0 {
+		result.ControlProbe = result.IPAttempts[0].Control
+		result.PQProbe = result.IPAttempts[0].PQ
+		result.CheckedIP = result.IPAttempts[0].IP
 	}
-	attempts = append(attempts, attempt)
-
-	result.IPAttempts = attempts
-	result.ControlProbe = control
-	result.PQProbe = attempt.PQ
 	if sawCertRetry {
 		result.Status = StatusCertError
 	} else if sawSupportedPair {
 		result.ControlProbe = supportedControl
 		result.PQProbe = supportedPQ
 		result.Status = StatusSupported
+	} else if sawTLS12 {
+		result.Status = StatusNotSupported
 	} else if sawControlSuccess {
 		result.Status = StatusNotSupported
 	} else if sawNoTLS13 {
@@ -239,8 +215,49 @@ func (c *Checker) checkResolvedWithWarnings(ctx context.Context, input string, t
 	} else {
 		result.Status = StatusUnknown
 	}
+	result.Network.Consistency = networkConsistency(result.IPAttempts)
 	summarizeResult(&result)
 	return result
+}
+
+func (c *Checker) checkIP(ctx context.Context, target Target, ip netip.Addr) (IPAttempt, TLSProbeResult) {
+	a := IPAttempt{IP: ip.String()}
+	if ip.Is4() {
+		a.Family = "ipv4"
+	} else {
+		a.Family = "ipv6"
+	}
+	a.Control = RunTLSProbe(ctx, target.Host, target.Port, net.IP(ip.AsSlice()), controlConfigWithRoots(target.SNI, c.roots), true)
+	if a.Control.Success || a.Control.InsecureRetryPerformed {
+		a.PQ = RunTLSProbe(ctx, target.Host, target.Port, net.IP(ip.AsSlice()), pqConfigWithRoots(target.SNI, c.roots), true)
+	}
+	if !a.Control.Success && !a.Control.InsecureRetryPerformed {
+		a.Readiness = "failed"
+	} else if isPQHybridCurveName(a.Control.NegotiatedCurve) {
+		a.Readiness = "post_quantum_preferred"
+	} else if isPQHybridCurveName(a.PQ.NegotiatedCurve) {
+		a.Readiness = "post_quantum_supported"
+	} else {
+		a.Readiness = "post_quantum_unsupported"
+	}
+	var tls12 TLSProbeResult
+	if shouldAttemptTLS12Fallback(a.Control) {
+		tls12 = runTLS12Fallback(ctx, target, ip, c.roots)
+	}
+	return a, tls12
+}
+
+func networkConsistency(attempts []IPAttempt) string {
+	if len(attempts) < 2 {
+		return "single_family"
+	}
+	if attempts[0].Readiness == "failed" || attempts[1].Readiness == "failed" {
+		return "partial"
+	}
+	if attempts[0].Readiness == attempts[1].Readiness {
+		return "consistent"
+	}
+	return "inconsistent"
 }
 
 func (c *Checker) MarshalJSON() ([]byte, error) {

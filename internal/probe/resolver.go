@@ -91,6 +91,27 @@ func ResolvePublicIPs(ctx context.Context, host string, max int) ([]netip.Addr, 
 	return safe, warnings, nil
 }
 
+// RepresentativeIPs bounds probing to one safe address per address family.
+// Resolver ordering is retained so selection is deterministic.
+func RepresentativeIPs(ips []netip.Addr) []netip.Addr {
+	result := make([]netip.Addr, 0, 2)
+	seen4, seen6 := false, false
+	for _, ip := range ips {
+		if ip.Is4() && !seen4 {
+			result = append(result, ip)
+			seen4 = true
+		}
+		if ip.Is6() && !seen6 {
+			result = append(result, ip)
+			seen6 = true
+		}
+		if seen4 && seen6 {
+			break
+		}
+	}
+	return result
+}
+
 func isBlockedAddr(addr netip.Addr) bool {
 	if !addr.IsValid() {
 		return true

@@ -81,7 +81,15 @@ func RunTLSProbe(ctx context.Context, host, port string, ip net.IP, cfg *tls.Con
 	result.TLSVersion = tlsVersionString(state.Version)
 	result.NegotiatedCurve = curveName(state.CurveID)
 	result.CipherSuite = tls.CipherSuiteName(state.CipherSuite)
+	result.ALPN = state.NegotiatedProtocol
+	result.HelloRetryRequest = state.HelloRetryRequest
+	result.OCSPStapled = len(state.OCSPResponse) > 0
+	result.SCTCount = len(state.SignedCertificateTimestamps)
 	result.PeerCertificates = len(state.PeerCertificates)
+	result.PresentedChain = ObservePresentedChain(state.PeerCertificates)
+	if len(state.VerifiedChains) > 0 {
+		result.VerifiedChain = ObserveVerifiedChain(state.VerifiedChains[0])
+	}
 	return result
 }
 
@@ -91,6 +99,7 @@ func controlConfig(host string) *tls.Config {
 		MinVersion:       tls.VersionTLS13,
 		MaxVersion:       tls.VersionTLS13,
 		CurvePreferences: defaultCurvePreferences(),
+		NextProtos:       []string{"h2", "http/1.1"},
 	}
 }
 
@@ -100,6 +109,7 @@ func controlConfigTLS12(host string) *tls.Config {
 		MinVersion:       tls.VersionTLS12,
 		MaxVersion:       tls.VersionTLS12,
 		CurvePreferences: []tls.CurveID{tls.X25519, tls.CurveP256, tls.CurveP384, tls.CurveP521},
+		NextProtos:       []string{"h2", "http/1.1"},
 	}
 }
 
@@ -115,6 +125,7 @@ func pqConfig(host string) *tls.Config {
 		MinVersion:       tls.VersionTLS13,
 		MaxVersion:       tls.VersionTLS13,
 		CurvePreferences: pqCurvePreferences(),
+		NextProtos:       []string{"h2", "http/1.1"},
 	}
 }
 
