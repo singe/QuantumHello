@@ -250,10 +250,12 @@ button:hover {
 .readiness { margin-top: 20px; }
 .readiness-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; margin-top: 14px; }
 .dimension { padding: 14px; border-radius: 14px; border: 1px solid var(--card-border); background: rgba(255,255,255,.04); }
-.dimension-summary { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.dimension-summary { display: flex; justify-content: flex-start; gap: 10px; align-items: center; }
 .dimension h3 { margin: 0; font-size: 1rem; }
 .dimension p { margin: 8px 0 0; color: var(--muted); font-size: .92rem; line-height: 1.45; }
 .dimension-state { font-size: .72rem; font-weight: 900; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); text-align: right; }
+.dimension-info { margin-left: auto; display: inline-grid; place-items: center; width: 20px; height: 20px; border: 1px solid var(--muted); border-radius: 50%; color: var(--muted); font-size: .75rem; font-weight: 900; cursor: help; }
+.dimension-info:hover, .dimension-info:focus-visible { color: var(--text); border-color: var(--accent); outline: 2px solid rgba(143,247,208,.25); outline-offset: 2px; }
 .dimension-post_quantum_preferred .dimension-state, .dimension-post_quantum .dimension-state, .dimension-healthy .dimension-state, .dimension-consistent .dimension-state { color: var(--accent); }
 .dimension-inconsistent .dimension-state, .dimension-partial .dimension-state, .dimension-classical .dimension-state { color: var(--warning); }
 .dimension-certificate_invalid .dimension-state, .dimension-unhealthy .dimension-state { color: var(--danger); }

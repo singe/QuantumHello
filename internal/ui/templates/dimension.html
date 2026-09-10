@@ -1,6 +1,6 @@
 {{define "dimension"}}
 <section class="dimension dimension-{{.State}}">
-  <div class="dimension-summary"><h3>{{.Title}}</h3><span class="dimension-state">{{.Label}}</span></div>
+  <div class="dimension-summary"><h3>{{.Title}}</h3><span class="dimension-state">{{.Label}}</span><span class="dimension-info" tabindex="0" role="img" aria-label="{{.Guidance}}" title="{{.Guidance}}">i</span></div>
   <p>{{.Summary}}</p>
 </section>
 {{end}}

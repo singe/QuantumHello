@@ -40,12 +40,30 @@ func parseTemplates() (*template.Template, error) {
 }
 
 type DimensionView struct {
-	Title string
+	Title    string
+	Guidance string
 	probe.DimensionAssessment
 }
 
 func viewDimension(title string, assessment probe.DimensionAssessment) DimensionView {
-	return DimensionView{Title: title, DimensionAssessment: assessment}
+	return DimensionView{Title: title, Guidance: dimensionGuidance(title, assessment), DimensionAssessment: assessment}
+}
+
+func dimensionGuidance(title string, assessment probe.DimensionAssessment) string {
+	switch title {
+	case "Key establishment":
+		return "Measures how TLS creates shared secrets. This result shows whether a standardized ML-KEM hybrid is used normally; improve by enabling and preferring an RFC 10024 hybrid."
+	case "Authentication":
+		return "Measures the algorithm proving the server's identity. This result shows whether its public key is post-quantum; improve by deploying a post-quantum authentication key and certificate."
+	case "Certificate chain":
+		return "Measures the signatures securing the verified certificate path. This result shows whether the chain is classical or post-quantum; improve by using a post-quantum-safe PKI path."
+	case "Deployment":
+		return "Measures consistency across tested network paths. This result shows whether IPv4 and IPv6 agree; improve by applying the same TLS configuration to every path."
+	case "TLS baseline":
+		return "Measures basic connection health. This result covers TLS version and certificate validation; improve by serving TLS 1.3 with a valid, trusted certificate."
+	default:
+		return assessment.Summary
+	}
 }
 
 func gradeLabel(grade probe.Grade) string {
