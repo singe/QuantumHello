@@ -1,87 +1,30 @@
 {{define "result_card"}}
-<article class="card result status-{{.Status}}">
-  <div class="status-line">
-    <span class="status-badge">{{statusIcon .Status}} {{statusLabel .Status}}</span>
-    {{if .ShareURL}}
-    <button
-      type="button"
-      class="api-button"
-      data-share-url="{{.ShareURL}}"
-      data-share-button
-      data-label-full="Share this result"
-      data-label-compact="Share"
-    >Share this result</button>
-    {{end}}
-  </div>
-  <!--<h2>{{statusHeadline .Status}}</h2>-->
-  <p>{{.Summary}}</p>
+<article class="card result grade-{{.Grade}} status-{{.Status}}">
+  <header class="assessment-hero">
+    <div class="grade-badge" aria-label="{{gradeLabel .Grade}} grade">{{gradeIcon .Grade}} {{gradeLabel .Grade}}</div>
+    <div class="assessment-copy"><h2>{{.Assessment.Headline}}</h2><p>{{.Assessment.Explanation}}</p></div>
+    {{if .ShareURL}}<button type="button" class="api-button" data-share-url="{{.ShareURL}}" data-share-button data-label-full="Share this result" data-label-compact="Share">Share this result</button>{{end}}
+  </header>
 
-  <dl class="details">
-    <div><dt>Host</dt><dd>{{.Host}}</dd></div>
-    <div><dt>Port</dt><dd>{{.Port}}</dd></div>
-    <div><dt>SNI</dt><dd>{{.SNI}}</dd></div>
-    {{if .ResolvedIPs}}
-    <div><dt>Resolved IPs</dt><dd>{{range $i, $ip := .ResolvedIPs}}{{if $i}}, {{end}}{{if eq $ip $.CheckedIP}}<mark class="resolved-ip resolved-ip--checked" title="Checked address">{{$ip}}</mark>{{else}}{{$ip}}{{end}}{{end}}</dd></div>
-    {{end}}
-  </dl>
-
-  <details {{if eq .Status "supported"}}open{{end}}>
-    <summary>Probe details</summary>
-    <div class="probe-grid">
-      <section>
-        <h3>Control probe</h3>
-        <dl class="probe-meta">
-          <div>
-            <dt>Offered curves</dt>
-            <dd>{{if .ControlProbe.OfferedCurves}}{{range $i, $curve := .ControlProbe.OfferedCurves}}{{if $i}}, {{end}}{{$curve}}{{end}}{{else}}none recorded{{end}}</dd>
-          </div>
-          <div>
-            <dt>Negotiated curve</dt>
-            <dd>{{if .ControlProbe.NegotiatedCurve}}<span class="curve-result curve-result--ok">{{.ControlProbe.NegotiatedCurve}}</span>{{else}}<span class="curve-result curve-result--missing">not negotiated</span>{{end}}</dd>
-          </div>
-        </dl>
-        <pre>{{prettyProbe $.CheckedIP .ControlProbe}}</pre>
-      </section>
-      {{if .TLS12Probe.Attempted}}
-      <section>
-        <h3>TLS 1.2 fallback</h3>
-        <dl class="probe-meta">
-          <div>
-            <dt>Offered curves</dt>
-            <dd>{{if .TLS12Probe.OfferedCurves}}{{range $i, $curve := .TLS12Probe.OfferedCurves}}{{if $i}}, {{end}}{{$curve}}{{end}}{{else}}none recorded{{end}}</dd>
-          </div>
-          <div>
-            <dt>Negotiated curve</dt>
-            <dd>{{if .TLS12Probe.NegotiatedCurve}}<span class="curve-result curve-result--ok">{{.TLS12Probe.NegotiatedCurve}}</span>{{else}}<span class="curve-result curve-result--missing">not negotiated</span>{{end}}</dd>
-          </div>
-        </dl>
-        <pre>{{prettyProbe $.CheckedIP .TLS12Probe}}</pre>
-      </section>
-      {{end}}
-      <section>
-        <h3>PQ hybrid probe</h3>
-        <dl class="probe-meta">
-          <div>
-            <dt>Offered curves</dt>
-            <dd>{{if .PQProbe.OfferedCurves}}{{range $i, $curve := .PQProbe.OfferedCurves}}{{if $i}}, {{end}}{{$curve}}{{end}}{{else}}none recorded{{end}}</dd>
-          </div>
-          <div>
-            <dt>Negotiated curve</dt>
-            <dd>{{if .PQProbe.NegotiatedCurve}}<span class="curve-result curve-result--ok">{{.PQProbe.NegotiatedCurve}}</span>{{else}}<span class="curve-result curve-result--missing">not negotiated</span>{{end}}</dd>
-          </div>
-        </dl>
-        <pre>{{prettyProbe $.CheckedIP .PQProbe}}</pre>
-      </section>
+  <details class="readiness" {{if or (eq .Grade "fair") (eq .Grade "bad") (eq .Grade "failed")}}open{{end}}>
+    <summary>Readiness details</summary>
+    <div class="readiness-grid">
+      {{template "dimension" (dimension "Key establishment" .Assessment.KeyEstablishment)}}
+      {{template "dimension" (dimension "Authentication" .Assessment.Authentication)}}
+      {{template "dimension" (dimension "Certificate chain" .Assessment.CertificateChain)}}
+      {{template "dimension" (dimension "Deployment" .Assessment.Deployment)}}
+      {{template "dimension" (dimension "TLS baseline" .Assessment.TLSBaseline)}}
     </div>
+    <p class="hndl-note"><strong>Harvest-now/decrypt-later:</strong> {{if .Assessment.HNDLProtected}}protected by the observed hybrid key establishment{{else}}not protected by an observed hybrid key establishment{{end}}.</p>
   </details>
 
-  {{if .Warnings}}
-  <div class="warnings">
-    <h3>Warnings</h3>
-    <ul>
-      {{range .Warnings}}<li>{{.}}</li>{{end}}
-    </ul>
-  </div>
-  {{end}}
+  <details class="technical"><summary>Connection details</summary>
+    <dl class="details"><div><dt>Host</dt><dd>{{.Host}}</dd></div><div><dt>Port</dt><dd>{{.Port}}</dd></div><div><dt>SNI</dt><dd>{{.SNI}}</dd></div><div><dt>TLS version</dt><dd>{{.ControlProbe.TLSVersion}}</dd></div><div><dt>Cipher</dt><dd>{{.ControlProbe.CipherSuite}}</dd></div><div><dt>ALPN</dt><dd>{{if .ControlProbe.ALPN}}{{.ControlProbe.ALPN}}{{else}}not negotiated{{end}}</dd></div><div><dt>HelloRetryRequest</dt><dd>{{if .ControlProbe.HelloRetryRequest}}yes{{else}}no{{end}}</dd></div><div><dt>OCSP stapled</dt><dd>{{if .ControlProbe.OCSPStapled}}yes{{else}}no{{end}}</dd></div><div><dt>SCTs</dt><dd>{{.ControlProbe.SCTCount}}</dd></div></dl>
+    <h3>Key establishment</h3><p>Normal: <code>{{if .ControlProbe.NegotiatedCurve}}{{.ControlProbe.NegotiatedCurve}}{{else}}not negotiated{{end}}</code> · PQ-only: <code>{{if .PQProbe.NegotiatedCurve}}{{.PQProbe.NegotiatedCurve}}{{else}}not negotiated{{end}}</code></p>
+    <h3>Certificates</h3>{{template "certificate_chain" .ControlProbe}}
+  </details>
+
+  <div class="result-actions"><a href="/api/check?url={{urlquery .InputURL}}" target="_blank" rel="noopener">View JSON / API</a><a href="/api/check?url={{urlquery .InputURL}}&download=1">Download JSON</a></div>
+  {{if .Warnings}}<div class="warnings"><h3>Warnings</h3><ul>{{range .Warnings}}<li>{{.}}</li>{{end}}</ul></div>{{end}}
 </article>
 {{end}}

@@ -1,0 +1,5 @@
+{{define "certificate_chain"}}
+{{if .VerifiedChain}}<h4>Verified chain</h4><div class="certificate-chain">{{range .VerifiedChain}}<div class="certificate"><strong>{{.Role}}</strong><span>{{.Subject}}</span><dl class="certificate-meta"><div><dt>Public key</dt><dd>{{.PublicKeyAlgorithm}}{{if .PublicKeyDetails}} {{.PublicKeyDetails}}{{end}}</dd></div><div><dt>Certificate signature</dt><dd>{{.SignatureAlgorithm}}</dd></div><div><dt>Valid until</dt><dd>{{.NotAfter}}</dd></div></dl></div>{{end}}</div>
+{{else if .PresentedChain}}<p class="muted">Presented chain (not verified)</p>{{range .PresentedChain}}<div class="certificate"><strong>{{.Role}}</strong> <span>{{.Subject}}</span> — {{.PublicKeyAlgorithm}}</div>{{end}}
+{{else}}<p class="muted">No certificate details were collected.</p>{{end}}
+{{end}}

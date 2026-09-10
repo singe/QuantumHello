@@ -239,6 +239,35 @@ button:hover {
   color: var(--warning);
 }
 
+.assessment-hero { display: flex; align-items: flex-start; gap: 16px; }
+.assessment-copy { flex: 1; }
+.assessment-copy h2 { margin: 4px 0 8px; font-size: 1.8rem; }
+.assessment-copy p { margin: 0; color: var(--muted); line-height: 1.55; }
+.grade-badge { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; padding: 9px 13px; border-radius: 999px; border: 1px solid var(--card-border); background: rgba(255,255,255,.06); font-weight: 900; text-transform: uppercase; letter-spacing: .08em; }
+.grade-excellent .grade-badge, .grade-good .grade-badge { color: var(--accent); }
+.grade-fair .grade-badge { color: var(--warning); }
+.grade-bad .grade-badge, .grade-failed .grade-badge { color: var(--danger); }
+.readiness { margin-top: 20px; }
+.readiness-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; margin-top: 14px; }
+.dimension { padding: 14px; border-radius: 14px; border: 1px solid var(--card-border); background: rgba(255,255,255,.04); }
+.dimension-summary { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.dimension h3 { margin: 0; font-size: 1rem; }
+.dimension p { margin: 8px 0 0; color: var(--muted); font-size: .92rem; line-height: 1.45; }
+.dimension-state { font-size: .72rem; font-weight: 900; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); text-align: right; }
+.dimension-post_quantum_preferred .dimension-state, .dimension-post_quantum .dimension-state, .dimension-healthy .dimension-state, .dimension-consistent .dimension-state { color: var(--accent); }
+.dimension-inconsistent .dimension-state, .dimension-partial .dimension-state, .dimension-classical .dimension-state { color: var(--warning); }
+.dimension-certificate_invalid .dimension-state, .dimension-unhealthy .dimension-state { color: var(--danger); }
+.hndl-note { margin: 14px 0 0; color: var(--muted); font-size: .9rem; }
+.result-actions { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 18px; }
+.result-actions a { color: var(--accent); font-weight: 700; }
+.technical h3 { margin: 18px 0 8px; font-size: 1rem; }
+.certificate-chain { display: grid; gap: 10px; }
+.certificate { padding: 12px 14px; border: 1px solid var(--card-border); border-radius: 14px; background: rgba(255,255,255,.04); }
+.certificate > span { display: block; margin-top: 4px; color: var(--muted); word-break: break-word; }
+.certificate-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin: 10px 0 0; }
+.certificate-meta dt { font-size: .68rem; }
+.certificate-meta dd { font-size: .86rem; }
+
 .details {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -570,4 +599,8 @@ mark.resolved-ip {
     font-size: 1rem;
     padding: 7px 10px;
   }
+
+  .assessment-hero { flex-wrap: wrap; }
+  .assessment-copy { order: 3; flex-basis: 100%; }
+  .assessment-copy h2 { font-size: 1.45rem; }
 }

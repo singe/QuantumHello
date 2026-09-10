@@ -25,6 +25,9 @@ func parseTemplates() (*template.Template, error) {
 		"statusHeadline": statusHeadline,
 		"pretty":         prettyJSON,
 		"prettyProbe":    prettyProbeJSON,
+		"gradeLabel":     gradeLabel,
+		"gradeIcon":      gradeIcon,
+		"dimension":      viewDimension,
 	}
 
 	tpl := template.New("").Funcs(funcs)
@@ -34,6 +37,37 @@ func parseTemplates() (*template.Template, error) {
 	}
 	sort.Strings(files)
 	return tpl.ParseFS(ui.Assets, files...)
+}
+
+type DimensionView struct {
+	Title string
+	probe.DimensionAssessment
+}
+
+func viewDimension(title string, assessment probe.DimensionAssessment) DimensionView {
+	return DimensionView{Title: title, DimensionAssessment: assessment}
+}
+
+func gradeLabel(grade probe.Grade) string {
+	if grade == "" {
+		return "Assessment"
+	}
+	return string(grade)
+}
+
+func gradeIcon(grade probe.Grade) string {
+	switch grade {
+	case probe.GradeExcellent:
+		return "✓✓"
+	case probe.GradeGood:
+		return "✓"
+	case probe.GradeFair:
+		return "!"
+	case probe.GradeBad:
+		return "✕"
+	default:
+		return "?"
+	}
 }
 
 func statusLabel(status probe.Status) string {
