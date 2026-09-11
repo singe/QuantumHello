@@ -29,6 +29,15 @@ var (
 		"2.16.840.1.101.3.4.3.18": "ML-DSA-65",
 		"2.16.840.1.101.3.4.3.19": "ML-DSA-87",
 	}
+	slhDSAPublicKeyOIDs = map[string]string{
+		"2.16.840.1.101.3.4.3.21": "SLH-DSA-SHA2-128s",
+		"2.16.840.1.101.3.4.3.22": "SLH-DSA-SHA2-128f",
+		"2.16.840.1.101.3.4.3.23": "SLH-DSA-SHA2-192s",
+		"2.16.840.1.101.3.4.3.24": "SLH-DSA-SHA2-192f",
+		"2.16.840.1.101.3.4.3.25": "SLH-DSA-SHA2-256s",
+		"2.16.840.1.101.3.4.3.26": "SLH-DSA-SHA2-256f",
+	}
+	slhDSASignatureOIDs = slhDSAPublicKeyOIDs
 )
 
 func ObserveCertificate(cert *x509.Certificate, position int, role string) CertificateObservation {
@@ -74,10 +83,18 @@ func publicKeyDescription(cert *x509.Certificate) (string, string, bool) {
 		return "Ed25519", "", false
 	}
 	var info struct {
-		Algorithm struct{ Algorithm asn1.ObjectIdentifier }
+		Algorithm asn1.RawValue
+		Key       asn1.RawValue
 	}
 	if _, err := asn1.Unmarshal(cert.RawSubjectPublicKeyInfo, &info); err == nil {
-		if name, ok := mlDSAPublicKeyOIDs[info.Algorithm.Algorithm.String()]; ok {
+		var algorithm struct{ Algorithm asn1.ObjectIdentifier }
+		if _, err := asn1.Unmarshal(info.Algorithm.FullBytes, &algorithm); err != nil {
+			return cert.PublicKeyAlgorithm.String(), "", false
+		}
+		if name, ok := mlDSAPublicKeyOIDs[algorithm.Algorithm.String()]; ok {
+			return name, name, true
+		}
+		if name, ok := slhDSAPublicKeyOIDs[algorithm.Algorithm.String()]; ok {
 			return name, name, true
 		}
 	}
@@ -95,8 +112,9 @@ func isMLDSASignature(cert *x509.Certificate) bool {
 		Signature struct{ Algorithm asn1.ObjectIdentifier }
 	}
 	if _, err := asn1.Unmarshal(cert.RawTBSCertificate, &info); err == nil {
-		_, ok := mlDSASignatureOIDs[info.Signature.Algorithm.String()]
-		return ok
+		_, mlDSA := mlDSASignatureOIDs[info.Signature.Algorithm.String()]
+		_, slhDSA := slhDSASignatureOIDs[info.Signature.Algorithm.String()]
+		return mlDSA || slhDSA
 	}
 	return false
 }

@@ -210,6 +210,25 @@ func TestObserveMLDSAPublicKey(t *testing.T) {
 	}
 }
 
+func TestObserveSLHDSAPublicKey(t *testing.T) {
+	oid := asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 25}
+	algorithm, err := asn1.Marshal(struct{ Algorithm asn1.ObjectIdentifier }{oid})
+	if err != nil {
+		t.Fatal(err)
+	}
+	spki, err := asn1.Marshal(struct {
+		Algorithm asn1.RawValue
+		Key       asn1.BitString
+	}{asn1.RawValue{FullBytes: algorithm}, asn1.BitString{Bytes: []byte{0}, BitLength: 8}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	obs := ObserveCertificate(&x509.Certificate{RawSubjectPublicKeyInfo: spki, PublicKeyAlgorithm: x509.UnknownPublicKeyAlgorithm}, 0, "root")
+	if obs.PublicKeyAlgorithm != "SLH-DSA-SHA2-256s" || !obs.PublicKeyPostQuantum {
+		t.Fatalf("unexpected SLH-DSA observation: %#v", obs)
+	}
+}
+
 func TestShouldAttemptTLS12Fallback(t *testing.T) {
 	if shouldAttemptTLS12Fallback(TLSProbeResult{ErrorClass: "connection_error", TransportErrorClass: "refused"}) {
 		t.Fatalf("expected refused ports to skip TLS 1.2 fallback")
