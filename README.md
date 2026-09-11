@@ -4,6 +4,21 @@ QuantumHello assesses a host's post-quantum TLS readiness. It checks TLS 1.3 ML-
 
 Grades range from `excellent` to `failed`. The new `grade` and `assessment` fields are the recommended API interface; `status` is retained as a legacy compatibility field.
 
+## Authentication evidence
+
+QuantumHello keeps three related TLS observations distinct:
+
+- The certificate's public key (for example, an ML-DSA authentication key).
+- The signatures on the certificate chain (for example, ML-DSA or SLH-DSA).
+- The TLS 1.3 `CertificateVerify` signature sent during the handshake.
+
+The checker currently reports the certificate public key and certificate-chain
+signatures, and a successful handshake confirms that the server authenticated
+with its private key. Go's public `crypto/tls` API does not expose the exact
+peer `CertificateVerify` signature scheme, so QuantumHello does not claim to
+identify that scheme independently yet. Adding that observation requires a
+lower-level or instrumented TLS implementation and is deferred for now.
+
 ## Run locally
 
 ```bash

@@ -54,7 +54,7 @@ func dimensionGuidance(title string, assessment probe.DimensionAssessment) strin
 	case "Key establishment":
 		return "Measures how TLS creates shared secrets. This result shows whether a standardized ML-KEM hybrid is used normally; improve by enabling and preferring an RFC 10024 hybrid."
 	case "Authentication":
-		return "Measures the algorithm proving the server's identity. This result shows whether its public key is post-quantum; improve by deploying a post-quantum authentication key and certificate."
+		return "Measures the server certificate's authentication key. This result shows whether that key is post-quantum; the exact TLS CertificateVerify signature is not exposed yet. Improve by deploying a post-quantum authentication key and certificate."
 	case "Certificate chain":
 		return "Measures the signatures securing the verified certificate path. This result shows whether the chain is classical or post-quantum; improve by using a post-quantum-safe PKI path."
 	case "Deployment":
