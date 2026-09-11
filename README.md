@@ -16,6 +16,19 @@ Check a host from the command line:
 go run ./cmd/web --check cloudflare.com
 ```
 
+## OQS interoperability test
+
+The opt-in live test exercises a curated set of classical and ML-DSA points
+published by the Open Quantum Safe interoperability server, including its
+non-443 ports. It does not change the production checker’s port restriction.
+
+```bash
+go test -tags=live ./internal/probe -run TestOQSLiveMatrix -timeout=2m
+```
+
+The live test requires Internet access and is intentionally excluded from
+ordinary `go test ./...` runs.
+
 ## HTTP endpoints
 
 - `GET /`

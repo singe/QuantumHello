@@ -109,6 +109,9 @@ func publicKeyDescription(cert *x509.Certificate) (string, string, bool) {
 			return name, name, true
 		}
 	}
+	if oid := subjectPublicKeyOID(cert); oid != "" {
+		return "unknown:" + oid, "OID " + oid, false
+	}
 	// Go may recognize the family but not expose the parameter set. The
 	// certificate signature still provides the parameter-set name for ML-DSA.
 	keyName := strings.ToUpper(cert.PublicKeyAlgorithm.String())
@@ -162,6 +165,21 @@ func parseOID(value string) asn1.ObjectIdentifier {
 	return result
 }
 
+func subjectPublicKeyOID(cert *x509.Certificate) string {
+	var info struct {
+		Algorithm asn1.RawValue
+		Key       asn1.RawValue
+	}
+	if _, err := asn1.Unmarshal(cert.RawSubjectPublicKeyInfo, &info); err != nil {
+		return ""
+	}
+	var algorithm struct{ Algorithm asn1.ObjectIdentifier }
+	if _, err := asn1.Unmarshal(info.Algorithm.FullBytes, &algorithm); err != nil {
+		return ""
+	}
+	return algorithm.Algorithm.String()
+}
+
 func isMLDSASignature(cert *x509.Certificate) bool {
 	name := strings.ToUpper(certificateSignatureName(cert))
 	if strings.Contains(name, "ML-DSA") || strings.Contains(name, "MLDSA") {
@@ -197,6 +215,9 @@ func certificateSignatureName(cert *x509.Certificate) string {
 		}
 		if value, ok := slhDSASignatureOIDs[oid]; ok {
 			return value
+		}
+		if oid != "" {
+			return "unknown:" + oid
 		}
 	}
 	return name
