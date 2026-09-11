@@ -1,6 +1,7 @@
 package probe
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/rsa"
@@ -98,7 +99,67 @@ func publicKeyDescription(cert *x509.Certificate) (string, string, bool) {
 			return name, name, true
 		}
 	}
+	// Some providers emit a valid SubjectPublicKeyInfo encoding that Go's
+	// generic ASN.1 struct cannot fully decode. Scan the DER for the known
+	// algorithm identifier before falling back to an opaque key name.
+	for _, item := range allPQPublicKeyOIDs() {
+		oid, name := item.oid, item.name
+		encoded, _ := asn1.Marshal(oid)
+		if bytes.Contains(cert.RawSubjectPublicKeyInfo, encoded) {
+			return name, name, true
+		}
+	}
+	// Go may recognize the family but not expose the parameter set. The
+	// certificate signature still provides the parameter-set name for ML-DSA.
+	keyName := strings.ToUpper(cert.PublicKeyAlgorithm.String())
+	if strings.Contains(keyName, "ML-DSA") || strings.Contains(keyName, "MLDSA") {
+		sigName := strings.ToUpper(cert.SignatureAlgorithm.String())
+		if strings.Contains(sigName, "ML-DSA-44") {
+			return "ML-DSA-44", "ML-DSA-44", true
+		}
+		if strings.Contains(sigName, "ML-DSA-65") {
+			return "ML-DSA-65", "ML-DSA-65", true
+		}
+		if strings.Contains(sigName, "ML-DSA-87") {
+			return "ML-DSA-87", "ML-DSA-87", true
+		}
+		return "ML-DSA", "ML-DSA", true
+	}
 	return cert.PublicKeyAlgorithm.String(), "", false
+}
+
+func allPQPublicKeyOIDs() []struct {
+	oid  asn1.ObjectIdentifier
+	name string
+} {
+	result := make([]struct {
+		oid  asn1.ObjectIdentifier
+		name string
+	}, 0, len(mlDSAPublicKeyOIDs)+len(slhDSAPublicKeyOIDs))
+	for value, name := range mlDSAPublicKeyOIDs {
+		result = append(result, struct {
+			oid  asn1.ObjectIdentifier
+			name string
+		}{parseOID(value), name})
+	}
+	for value, name := range slhDSAPublicKeyOIDs {
+		result = append(result, struct {
+			oid  asn1.ObjectIdentifier
+			name string
+		}{parseOID(value), name})
+	}
+	return result
+}
+
+func parseOID(value string) asn1.ObjectIdentifier {
+	parts := strings.Split(value, ".")
+	result := make(asn1.ObjectIdentifier, len(parts))
+	for i, part := range parts {
+		var n int
+		fmt.Sscan(part, &n)
+		result[i] = n
+	}
+	return result
 }
 
 func isMLDSASignature(cert *x509.Certificate) bool {
