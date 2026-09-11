@@ -44,7 +44,7 @@ var (
 func ObserveCertificate(cert *x509.Certificate, position int, role string) CertificateObservation {
 	obs := CertificateObservation{
 		Position: position, Role: role, Subject: cert.Subject.String(), Issuer: cert.Issuer.String(),
-		SignatureAlgorithm: cert.SignatureAlgorithm.String(), NotBefore: cert.NotBefore.UTC().Format("2006-01-02T15:04:05Z"),
+		SignatureAlgorithm: certificateSignatureName(cert), NotBefore: cert.NotBefore.UTC().Format("2006-01-02T15:04:05Z"),
 		NotAfter: cert.NotAfter.UTC().Format("2006-01-02T15:04:05Z"), DNSNames: append([]string(nil), cert.DNSNames...),
 	}
 	obs.PublicKeyAlgorithm, obs.PublicKeyDetails, obs.PublicKeyPostQuantum = publicKeyDescription(cert)
@@ -163,7 +163,7 @@ func parseOID(value string) asn1.ObjectIdentifier {
 }
 
 func isMLDSASignature(cert *x509.Certificate) bool {
-	name := strings.ToUpper(cert.SignatureAlgorithm.String())
+	name := strings.ToUpper(certificateSignatureName(cert))
 	if strings.Contains(name, "ML-DSA") || strings.Contains(name, "MLDSA") {
 		return true
 	}
@@ -178,4 +178,26 @@ func isMLDSASignature(cert *x509.Certificate) bool {
 		return mlDSA || slhDSA
 	}
 	return false
+}
+
+func certificateSignatureName(cert *x509.Certificate) string {
+	name := cert.SignatureAlgorithm.String()
+	if name != "" && name != "0" && name != "UnknownSignatureAlgorithm" {
+		return name
+	}
+	var info struct {
+		Version   int `asn1:"optional,explicit,tag:0,default:0"`
+		Serial    asn1.RawValue
+		Signature struct{ Algorithm asn1.ObjectIdentifier }
+	}
+	if _, err := asn1.Unmarshal(cert.RawTBSCertificate, &info); err == nil {
+		oid := info.Signature.Algorithm.String()
+		if value, ok := mlDSASignatureOIDs[oid]; ok {
+			return value
+		}
+		if value, ok := slhDSASignatureOIDs[oid]; ok {
+			return value
+		}
+	}
+	return name
 }
